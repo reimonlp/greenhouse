@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-esp32:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+          key: ${{ runner.os }}-platformio-${{ hashFiles('**/platformio.ini') }}
+      - name: Build default env
+        run: pio run -e esp32-c3-devkitm-1
+      - name: Build minimal env
+        run: pio run -e esp32-c3-minimal
+  native-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+      - name: Run native build (rule engine tests)
+        run: pio run -e native
