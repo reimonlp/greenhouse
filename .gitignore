@@ -10,13 +10,13 @@ include/secrets.h
 # Node.js dependencies
 node_modules/
 greenhouse-dashboard/node_modules/
-mongodb-backend/node_modules/
+
+# mongodb-backend (código muerto - ignorar completamente)
+mongodb-backend/
 
 # Build outputs
 greenhouse-dashboard/dist/
 greenhouse-dashboard/build/
-mongodb-backend/dist/
-mongodb-backend/build/
 
 # Logs
 *.log
