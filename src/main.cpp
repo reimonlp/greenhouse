@@ -170,8 +170,7 @@ void syncRules() {
         failedRequests++;
     } else {
         DEBUG_PRINTLN("✓ Rules synced successfully");
-        // TODO: Parsear y aplicar reglas localmente si se necesita
-        // Por ahora, las reglas se ejecutan en el servidor
+        // Rules are executed on the VPS server
     }
 }
 

@@ -6,3 +6,9 @@
 
 # Local secrets (copiar de include/secrets.example.h)
 include/secrets.h
+
+# Cleanup backup (archivos obsoletos)
+.cleanup_backup/
+
+# Python virtual environment
+.venv/

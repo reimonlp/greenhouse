@@ -4,6 +4,14 @@
 #include "relays.h"
 #include <Arduino.h>
 
+// Define relay pins array
+const uint8_t RelayManager::relayPins[4] = {
+    RELAY_LUCES_PIN,
+    RELAY_VENTILADOR_PIN,
+    RELAY_BOMBA_PIN,
+    RELAY_CALEFACTOR_PIN
+};
+
 // Static strings in PROGMEM for relay names
 const char RelayManager::relayName0[] PROGMEM = "luces";
 const char RelayManager::relayName1[] PROGMEM = "ventilador";
