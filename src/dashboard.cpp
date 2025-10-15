@@ -47,6 +47,17 @@ void DashboardManager::setupRoutes(AsyncWebServer* webServer) {
     server->on("/script.js", HTTP_ANY, [this](AsyncWebServerRequest* req){
         serveStaticCompressed(req, "/script.js", "application/javascript", false);
     });
+    server->on("/relay_manager.js", HTTP_ANY, [this](AsyncWebServerRequest* req){
+        serveStaticCompressed(req, "/relay_manager.js", "application/javascript", false);
+    });
+    // Icons sprite route
+    server->on("/icons.svg", HTTP_GET, [this](AsyncWebServerRequest* req){
+        if (LittleFS.exists("/icons.svg")) {
+            req->send(LittleFS, "/icons.svg", "image/svg+xml");
+        } else {
+            req->send(404, "text/plain", "Not found");
+        }
+    });
     // Endpoint de diagnóstico para listar archivos del FS
     server->on("/fslist", HTTP_GET, [](AsyncWebServerRequest* req){
         if (!LittleFS.begin()) { // no format
@@ -159,16 +170,15 @@ void DashboardManager::sendSensorUpdate(const SensorData& data){
     payload["humidity"] = data.humidity;
     payload["soil_moisture_1"] = data.soil_moisture_1;
     payload["soil_moisture_2"] = data.soil_moisture_2;
-    payload["temp_sensor_1"] = data.temp_sensor_1;
-    payload["temp_sensor_2"] = data.temp_sensor_2;
+    // External temperatures removed
     payload["valid"] = data.valid;
     
     // Add sensor flags for better status indication
     JsonObject flags = payload.createNestedObject("flags");
     flags["dht"] = (data.temperature > -40 && data.humidity >= 0); // Basic DHT validity check
     flags["soil_complete"] = (data.soil_moisture_1 >= 0 && data.soil_moisture_2 >= 0);
-    flags["ext_temps_complete"] = (data.temp_sensor_1 > -50 && data.temp_sensor_2 > -50);
-    flags["overall_complete"] = flags["dht"] && flags["soil_complete"] && flags["ext_temps_complete"];
+    // External temps removed; overall completeness based on DHT and soil only
+    flags["overall_complete"] = flags["dht"] && flags["soil_complete"];
     
     String out; 
     serializeJson(doc, out);

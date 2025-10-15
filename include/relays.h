@@ -57,6 +57,7 @@ public:
     bool setRelay(int relayIndex, bool state);
     bool toggleRelay(int relayIndex);
     bool getRelayState(int relayIndex);
+    RelayState getRelayStateStruct(int relayIndex);  // For rule engine
     
     // Control de modo
     bool setRelayMode(int relayIndex, RelayMode mode);

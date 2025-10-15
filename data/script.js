@@ -11,11 +11,170 @@
 
 const CONFIG = {
     API_BASE: window.location.origin,
+    WS_URL: `ws://${window.location.hostname}/ws`,
     POLL_INTERVAL: 8000,
     CHART_MAX_POINTS: 50,
     STORAGE_KEY_TOKEN: 'gh_api_token',
-    STORAGE_KEY_VIEW: 'gh_active_view'
+    STORAGE_KEY_VIEW: 'gh_active_view',
+    WS_RECONNECT_DELAY: 3000,
+    WS_PING_INTERVAL: 30000
 };
+
+// ============================================
+// WebSocket Manager
+// ============================================
+
+class WebSocketManager {
+    constructor() {
+        this.ws = null;
+        this.isConnected = false;
+        this.reconnectTimer = null;
+        this.pingTimer = null;
+        this.messageHandlers = {};
+        this.requestId = 0;
+        this.pendingRequests = new Map();
+    }
+
+    connect(token) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            return; // Already connected
+        }
+
+        console.log('[WS] Connecting to', CONFIG.WS_URL);
+        this.ws = new WebSocket(CONFIG.WS_URL);
+        
+        this.ws.onopen = () => {
+            console.log('[WS] Connected');
+            this.isConnected = true;
+            this.startPingTimer();
+            this.emit('connected');
+        };
+
+        this.ws.onclose = () => {
+            console.log('[WS] Disconnected');
+            this.isConnected = false;
+            this.stopPingTimer();
+            this.emit('disconnected');
+            this.scheduleReconnect(token);
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('[WS] Error:', error);
+            this.emit('error', error);
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+            } catch (error) {
+                console.error('[WS] Failed to parse message:', error);
+            }
+        };
+    }
+
+    disconnect() {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this.stopPingTimer();
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+        }
+        this.isConnected = false;
+    }
+
+    scheduleReconnect(token) {
+        if (this.reconnectTimer) return;
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            this.connect(token);
+        }, CONFIG.WS_RECONNECT_DELAY);
+    }
+
+    startPingTimer() {
+        this.stopPingTimer();
+        this.pingTimer = setInterval(() => {
+            this.send({ type: 'ping' });
+        }, CONFIG.WS_PING_INTERVAL);
+    }
+
+    stopPingTimer() {
+        if (this.pingTimer) {
+            clearInterval(this.pingTimer);
+            this.pingTimer = null;
+        }
+    }
+
+    send(data) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.warn('[WS] Cannot send, not connected');
+            return false;
+        }
+        this.ws.send(JSON.stringify(data));
+        return true;
+    }
+
+    sendRequest(data) {
+        return new Promise((resolve, reject) => {
+            const id = ++this.requestId;
+            data.id = id;
+            
+            if (this.send(data)) {
+                this.pendingRequests.set(id, { resolve, reject });
+                
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    if (this.pendingRequests.has(id)) {
+                        this.pendingRequests.delete(id);
+                        reject(new Error('Request timeout'));
+                    }
+                }, 10000);
+            } else {
+                reject(new Error('WebSocket not connected'));
+            }
+        });
+    }
+
+    handleMessage(data) {
+        // Handle request responses
+        if (data.requestId && this.pendingRequests.has(data.requestId)) {
+            const { resolve } = this.pendingRequests.get(data.requestId);
+            this.pendingRequests.delete(data.requestId);
+            resolve(data);
+            return;
+        }
+
+        // Emit type-specific events
+        if (data.type) {
+            this.emit(data.type, data);
+        }
+    }
+
+    on(event, handler) {
+        if (!this.messageHandlers[event]) {
+            this.messageHandlers[event] = [];
+        }
+        this.messageHandlers[event].push(handler);
+    }
+
+    off(event, handler) {
+        if (this.messageHandlers[event]) {
+            this.messageHandlers[event] = this.messageHandlers[event].filter(h => h !== handler);
+        }
+    }
+
+    emit(event, data) {
+        if (this.messageHandlers[event]) {
+            this.messageHandlers[event].forEach(handler => handler(data));
+        }
+    }
+}
+
+// Global WebSocket instance
+const wsManager = new WebSocketManager();
 
 // ============================================
 // State Management
@@ -30,7 +189,7 @@ class AppState {
             logs: [],
             apiToken: this.loadToken(),
             isAuthenticated: !!localStorage.getItem(CONFIG.STORAGE_KEY_TOKEN),
-            currentView: this.loadView() || 'dashboard',
+            currentView: this.loadView() || 'dht',
             isConnected: false,
             lastUpdate: null,
             logoutRequested: false
@@ -143,6 +302,20 @@ class APIService {
     }
 
     async setRelay(index, state) {
+        // Try WebSocket first, fallback to HTTP
+        if (wsManager.isConnected) {
+            try {
+                return await wsManager.sendRequest({
+                    type: 'setRelay',
+                    relay: index,
+                    state: state,
+                    token: appState.getState().apiToken
+                });
+            } catch (error) {
+                console.warn('[WS] setRelay failed, falling back to HTTP:', error);
+            }
+        }
+        
         return this.fetch('/api/relays/set', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -151,6 +324,20 @@ class APIService {
     }
 
     async setRelayMode(index, mode) {
+        // Try WebSocket first, fallback to HTTP
+        if (wsManager.isConnected) {
+            try {
+                return await wsManager.sendRequest({
+                    type: 'setRelayMode',
+                    relay: index,
+                    mode: mode,
+                    token: appState.getState().apiToken
+                });
+            } catch (error) {
+                console.warn('[WS] setRelayMode failed, falling back to HTTP:', error);
+            }
+        }
+        
         return this.fetch('/api/relays/mode', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -173,6 +360,39 @@ class APIService {
     async clearLogs() {
         return this.fetch('/api/logs/clear', { method: 'DELETE' });
     }
+
+    // Rule management endpoints
+    async getRelayRules(relayId) {
+        return this.fetch(`/api/relays/${relayId}/rules`);
+    }
+
+    async saveRelayRule(relayId, rule) {
+        return this.fetch(`/api/relays/${relayId}/rules`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(rule)
+        });
+    }
+
+    async updateRelayRule(relayId, ruleIndex, rule) {
+        return this.fetch(`/api/relays/${relayId}/rules/${ruleIndex}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(rule)
+        });
+    }
+
+    async deleteRelayRule(relayId, ruleIndex) {
+        return this.fetch(`/api/relays/${relayId}/rules/${ruleIndex}`, {
+            method: 'DELETE'
+        });
+    }
+
+    async clearRelayRules(relayId) {
+        return this.fetch(`/api/relays/${relayId}/rules`, {
+            method: 'DELETE'
+        });
+    }
 }
 
 const api = new APIService();
@@ -194,6 +414,8 @@ class UIController {
             sidebar: document.getElementById('sidebar'),
             sidebarToggle: document.getElementById('sidebarToggle'),
             navItems: document.querySelectorAll('.nav-item'),
+            topTabs: document.querySelectorAll('.top-tab'),
+            views: document.querySelectorAll('.view'),
             statusIndicator: document.getElementById('statusIndicator'),
             statusText: document.getElementById('statusText'),
             authBtn: document.getElementById('authBtn'),
@@ -212,16 +434,16 @@ class UIController {
             alertMessage: document.getElementById('alertMessage'),
             alertCloseBtn: document.getElementById('alertCloseBtn'),
 
-            // Dashboard - Sensor cards
-            temperature: document.getElementById('temperature'),
-            humidity: document.getElementById('humidity'),
-            soil1: document.getElementById('soil1'),
-            soil2: document.getElementById('soil2'),
-            temp1: document.getElementById('temp1'),
-            temp2: document.getElementById('temp2'),
-            dhtStatus: document.getElementById('dht-status'),
-            soilStatus: document.getElementById('soil-status'),
-            tempSensorsStatus: document.getElementById('temp-sensors-status'),
+            // (Dashboard removed) quick summary bindings no longer used
+            // DHT/NTC dedicated views
+            temperature_dht: document.getElementById('temperature_dht'),
+            humidity_dht: document.getElementById('humidity_dht'),
+            dht_status_dht: document.getElementById('dht_status_dht'),
+            // NTC removed
+            // Soil dedicated view
+            soil1_soil: document.getElementById('soil1_soil'),
+            soil2_soil: document.getElementById('soil2_soil'),
+            soil_status_soil: document.getElementById('soil_status_soil'),
             
             // Statistics
             tempRange: document.getElementById('tempRange'),
@@ -245,9 +467,18 @@ class UIController {
             systemState: document.getElementById('systemState'),
             lastDataTime: document.getElementById('lastDataTime'),
 
-            // Charts
+            // Charts (NTC removed)
             envChart: document.getElementById('envChart'),
-            soilChart: document.getElementById('soilChart')
+
+            // Logs
+            logsList: document.getElementById('logsList'),
+            logsFilter: document.getElementById('logsFilter'),
+
+            // Relay views (new - separate tabs)
+            lucesView: document.getElementById('lucesView'),
+            ventiladorView: document.getElementById('ventiladorView'),
+            bombaView: document.getElementById('bombaView'),
+            calefactorView: document.getElementById('calefactorView')
         };
     }
 
@@ -258,6 +489,14 @@ class UIController {
         // Navigation
         this.elements.navItems.forEach(item => {
             item.addEventListener('click', () => this.switchView(item.dataset.view));
+        });
+
+        // Top tab navigation (mobile)
+        this.elements.topTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                this.elements.topTabs.forEach(t => t.classList.toggle('active', t === tab));
+                this.switchView(tab.dataset.view);
+            });
         });
 
         // Auth buttons (support duplicate IDs in layout)
@@ -299,6 +538,34 @@ class UIController {
 
         // Clear logs
         document.getElementById('clearLogs')?.addEventListener('click', () => this.clearLogs());
+
+        // Help tooltips: click to show, click outside to hide
+        document.querySelectorAll('.help-icon').forEach(el => {
+            el.addEventListener('click', (e) => {
+                const msg = el.getAttribute('data-help') || '';
+                this.showTooltip(e.clientX, e.clientY, msg);
+                e.stopPropagation();
+            });
+        });
+        document.addEventListener('click', () => this.hideTooltip());
+
+        // Logs: toggle details with event delegation
+        this.elements.logsList?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.log-toggle');
+            if (!btn) return;
+            const row = btn.closest('.log-row');
+            const pre = row?.querySelector('.log-data');
+            if (!pre) return;
+            const visible = pre.style.display === 'block';
+            pre.style.display = visible ? 'none' : 'block';
+            btn.textContent = visible ? 'Detalles' : 'Ocultar';
+        });
+
+        // Logs: filter change triggers rerender
+        this.elements.logsFilter?.addEventListener('change', () => {
+            const state = appState.getState();
+            this.renderLogs(state.logs);
+        });
     }
 
     toggleSidebar() {
@@ -306,47 +573,58 @@ class UIController {
     }
 
     switchView(viewName) {
-    // Switching view log removed
-        
-        // Update navigation
+        // Update navigation state
         this.elements.navItems.forEach(item => {
             item.classList.toggle('active', item.dataset.view === viewName);
         });
 
-        // Scroll to the corresponding section
-        // Since the HTML has a single-page layout, we'll scroll to relevant sections
-        let targetElement = null;
-        
-        switch(viewName) {
-            case 'dashboard':
-                // Scroll to top (sensor cards)
-                targetElement = document.querySelector('.sensor-grid');
-                break;
-            case 'sensors':
-                // Scroll to charts section
-                targetElement = document.querySelector('.charts-container');
-                break;
-            case 'control':
-                // Scroll to relay section
-                targetElement = document.getElementById('relay-section');
-                break;
-            case 'system':
-                // Scroll to system info section
-                targetElement = document.querySelector('.system-grid');
-                break;
-            case 'logs':
-                // For now, show alert that logs view is not implemented
-                this.showAlert('Logs view coming soon', 'info');
-                break;
-        }
-        
-        if (targetElement) {
-            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        // Toggle tab views (no scrolling). If viewName doesn't exist, fall back to 'dht'
+        const hasView = Array.from(this.elements.views).some(v => v.dataset.view === viewName);
+        const targetView = hasView ? viewName : 'dht';
+        this.elements.views.forEach(v => {
+            v.classList.toggle('active', v.dataset.view === targetView);
+        });
+        // Sync top tabs active state
+        this.elements.topTabs.forEach(t => t.classList.toggle('active', t.dataset.view === targetView));
 
+        // If navigating to logs, refresh once
+        if (targetView === 'logs') {
+            if (!appState.getState().apiToken) {
+                // Inform about auth requirement
+                if (this.elements.logsList) {
+                    this.elements.logsList.innerHTML = '<div style="color:var(--text-secondary)">Autenticación requerida para ver logs. Pulsa la llave para ingresar el token.</div>';
+                }
+            } else {
+                this.refreshLogs();
+            }
+        }
         // Save preference
-        appState.saveView(viewName);
-        appState.setState({ currentView: viewName });
+        appState.saveView(targetView);
+        appState.setState({ currentView: targetView });
+    }
+
+    showTooltip(x, y, message) {
+        const tip = document.getElementById('tooltip');
+        if (!tip) return;
+        tip.textContent = message;
+        tip.style.display = 'block';
+        // Position with small offset and bounds clamp
+        const offset = 10;
+        let left = x + offset;
+        let top = y + offset;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+        // Clamp if overflow
+        const rect = tip.getBoundingClientRect();
+        if (rect.right > vw) tip.style.left = (vw - rect.width - offset) + 'px';
+        if (rect.bottom > vh) tip.style.top = (vh - rect.height - offset) + 'px';
+    }
+
+    hideTooltip() {
+        const tip = document.getElementById('tooltip');
+        if (tip) tip.style.display = 'none';
     }
 
     showAuthModal() {
@@ -433,29 +711,24 @@ class UIController {
     }
 
     updateSensorDisplay(data) {
-        // Temperature & Humidity
-        if (this.elements.temperature) {
-            this.elements.temperature.textContent = data.temperature ? `${data.temperature.toFixed(1)}°C` : '--°C';
+        // DHT view mirrors env values
+        if (this.elements.temperature_dht) {
+            this.elements.temperature_dht.textContent = data.temperature ? `${data.temperature.toFixed(1)}°C` : '--°C';
         }
-        if (this.elements.humidity) {
-            this.elements.humidity.textContent = data.humidity ? `${data.humidity.toFixed(1)}%` : '--%';
+        if (this.elements.humidity_dht) {
+            this.elements.humidity_dht.textContent = data.humidity ? `${data.humidity.toFixed(1)}%` : '--%';
         }
         
         // Soil moisture
-        if (this.elements.soil1) {
-            this.elements.soil1.textContent = data.soil_moisture_1 !== undefined ? `${data.soil_moisture_1.toFixed(1)}%` : '--%';
+        if (this.elements.soil1_soil) {
+            this.elements.soil1_soil.textContent = data.soil_moisture_1 !== undefined ? `${data.soil_moisture_1.toFixed(1)}%` : '--%';
         }
-        if (this.elements.soil2) {
-            this.elements.soil2.textContent = data.soil_moisture_2 !== undefined ? `${data.soil_moisture_2.toFixed(1)}%` : '--%';
+        if (this.elements.soil2_soil) {
+            this.elements.soil2_soil.textContent = data.soil_moisture_2 !== undefined ? `${data.soil_moisture_2.toFixed(1)}%` : '--%';
         }
         
         // External temperature sensors
-        if (this.elements.temp1) {
-            this.elements.temp1.textContent = data.temp_sensor_1 !== undefined ? `${data.temp_sensor_1.toFixed(1)}°C` : '--°C';
-        }
-        if (this.elements.temp2) {
-            this.elements.temp2.textContent = data.temp_sensor_2 !== undefined ? `${data.temp_sensor_2.toFixed(1)}°C` : '--°C';
-        }
+        // NTC removed
         
         // Statistics
         if (data.statistics) {
@@ -486,17 +759,15 @@ class UIController {
     updateSensorStatus(data) {
         const dhtValid = data.flags?.dht || (data.temperature !== null && data.humidity !== null);
         const soilValid = data.flags?.soil_complete || (data.soil_moisture_1 > 0 || data.soil_moisture_2 > 0);
-        const extTempValid = data.flags?.ext_temps_complete || (data.temp_sensor_1 > 0 || data.temp_sensor_2 > 0);
+    // External temps removed
 
-        if (this.elements.dhtStatus) {
-            this.elements.dhtStatus.textContent = dhtValid ? '🟢' : '🔴';
+        if (this.elements.dht_status_dht) {
+            this.elements.dht_status_dht.textContent = dhtValid ? '🟢' : '🔴';
         }
-        if (this.elements.soilStatus) {
-            this.elements.soilStatus.textContent = soilValid ? '🟢' : '🔴';
+        if (this.elements.soil_status_soil) {
+            this.elements.soil_status_soil.textContent = soilValid ? '🟢' : '🔴';
         }
-        if (this.elements.tempSensorsStatus) {
-            this.elements.tempSensorsStatus.textContent = extTempValid ? '🟢' : '🔴';
-        }
+        // NTC status removed
     }
 
     updateControlView() {
@@ -525,47 +796,55 @@ class UIController {
 
     updateRelaysDisplay(data) {
         const grid = this.elements.relayGrid || document.getElementById('relayGrid');
-        if (!grid || !data || !data.relays) return;
+        
+        // Update old control grid view if it exists (for backward compatibility)
+        if (grid && data && data.relays) {
+            const relayNames = ['Luces', 'Calefactor', 'Ventilador', 'Bomba'];
+            const relayIcons = ['💡', '🔥', '🌀', '💧'];
 
-        const relayNames = ['Luces', 'Calefactor', 'Ventilador', 'Bomba'];
-        const relayIcons = ['💡', '🔥', '🌀', '💧'];
-
-        grid.innerHTML = data.relays.map((relay, index) => `
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">${relayIcons[index]} ${relayNames[index]}</h3>
-                    <div class="relay-status ${relay.state ? 'active' : 'inactive'}">
-                        ${relay.state ? 'ON' : 'OFF'}
+            grid.innerHTML = data.relays.map((relay, index) => `
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">${relayIcons[index]} ${relayNames[index]}</h3>
+                        <div class="relay-status ${relay.state ? 'active' : 'inactive'}">
+                            ${relay.state ? 'ON' : 'OFF'}
+                        </div>
                     </div>
-                </div>
-                <div class="card-body">
-                    <div class="relay-controls">
-                        <button class="btn-primary" onclick="toggleRelay(${index}, ${!relay.state})">
-                            ${relay.state ? 'Apagar' : 'Encender'}
-                        </button>
-                        <select onchange="setRelayMode(${index}, this.value)" class="input-field">
-                            <option value="manual" ${relay.mode === 'manual' ? 'selected' : ''}>Manual</option>
-                            <option value="auto" ${relay.mode === 'auto' ? 'selected' : ''}>Auto</option>
-                        </select>
-                    </div>
-                    <div class="info-list">
-                        <div class="info-item">
-                            <span class="info-label">Tiempo total ON</span>
-                            <span class="info-value">${this.formatDuration(relay.total_on_time || 0)}</span>
+                    <div class="card-body">
+                        <div class="relay-controls">
+                            <button class="btn-primary" onclick="toggleRelay(${index}, ${!relay.state})">
+                                ${relay.state ? 'Apagar' : 'Encender'}
+                            </button>
+                            <select onchange="setRelayMode(${index}, this.value)" class="input-field">
+                                <option value="manual" ${relay.mode === 'manual' ? 'selected' : ''}>Manual</option>
+                                <option value="auto" ${relay.mode === 'auto' ? 'selected' : ''}>Auto</option>
+                            </select>
+                        </div>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="info-label">Tiempo total ON</span>
+                                <span class="info-value">${this.formatDuration(relay.total_on_time || 0)}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `).join('');
+            grid.style.display = 'grid';
+        }
 
-        // Ensure grid is visible in case toggle ran earlier
-        grid.style.display = 'grid';
-    // Rendered relays debug log removed
+        // Update individual relay views (new UI)
+        if (data && data.relays && typeof relayManager !== 'undefined') {
+            data.relays.forEach((relay, index) => {
+                relayManager.refreshRelay(index);
+            });
+        }
 
         // Update quick stats
-        const activeCount = data.relays.filter(r => r.state).length;
-        const quick = document.getElementById('quickRelays');
-        if (quick) quick.textContent = `${activeCount}/4`;
+        if (data && data.relays) {
+            const activeCount = data.relays.filter(r => r.state).length;
+            const quick = document.getElementById('quickRelays');
+            if (quick) quick.textContent = `${activeCount}/4`;
+        }
     }
 
     updateSystemDisplay(data) {
@@ -664,6 +943,8 @@ class UIController {
         ctx.stroke();
     }
 
+    // drawNTCChart removed
+
     // Refresh methods
     async refreshDashboard() {
         await app.updateSensors();
@@ -719,6 +1000,96 @@ class UIController {
             this.showAlert('Error al limpiar logs', 'danger');
         }
     }
+
+    renderLogs(data) {
+        const container = this.elements.logsList;
+        if (!container) return;
+        try {
+            // Accept both array and {logs: []}
+            // Also accept MongoDB Data API shape: {documents: [...]}
+            let entries = Array.isArray(data)
+                ? data
+                : (Array.isArray(data.logs)
+                    ? data.logs
+                    : (Array.isArray(data.documents) ? data.documents : []));
+            if (!entries.length) {
+                container.innerHTML = '<div style="color:var(--text-secondary)">Sin registros.</div>';
+                return;
+            }
+            // Newest first by timestamp
+            entries.sort((a, b) => (b.timestamp || b.ts || 0) - (a.timestamp || a.ts || 0));
+
+            // Filter by level if requested
+            const filter = this.elements.logsFilter?.value || 'all';
+            const lvlNum = (e) => (typeof e.level !== 'undefined') ? e.level : e.lvl;
+            entries = entries.filter(e => {
+                const l = lvlNum(e) ?? 1;
+                if (filter === 'crit') return l >= 4;
+                if (filter === 'error+') return l >= 3;
+                if (filter === 'warn+') return l >= 2;
+                return true;
+            });
+            if (!entries.length) {
+                container.innerHTML = '<div style="color:var(--text-secondary)">Sin registros para este filtro.</div>';
+                return;
+            }
+
+            const esc = (s) => String(s ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            const levelClass = (lvlNum) => {
+                switch (lvlNum) {
+                    case 0: return 'level-debug';
+                    case 1: return 'level-info';
+                    case 2: return 'level-warn';
+                    case 3: return 'level-error';
+                    case 4: return 'level-crit';
+                    default: return 'level-info';
+                }
+            };
+
+            const levelText = (lvlNum) => ({0:'DEBUG',1:'INFO',2:'WARN',3:'ERROR',4:'CRIT'})[lvlNum] || 'INFO';
+
+            const colorizeJSON = (jsonStr) => {
+                // Super simple syntax highlighter for JSON
+                const s = esc(jsonStr);
+                return s
+                    .replace(/(&quot;.*?&quot;)(\s*:\s*)/g, '<span class="j-key">$1</span>$2')
+                    .replace(/:\s*(&quot;.*?&quot;)/g, ': <span class="j-str">$1</span>')
+                    .replace(/:\s*(\d+\.?\d*)/g, ': <span class="j-num">$1</span>')
+                    .replace(/:\s*(true|false|null)/g, ': <span class="j-bool">$1</span>');
+            };
+
+            const html = entries.map(e => {
+                const ts = e.timestamp ?? e.ts ?? 0;
+                const date = ts ? new Date(ts * 1000).toLocaleString() : '';
+                const lvlNum = (typeof e.level !== 'undefined') ? e.level : e.lvl;
+                const lvlCls = levelClass(lvlNum);
+                const lvlTxt = levelText(lvlNum);
+                const src = e.source || e.src || '';
+                const msg = e.message || e.msg || '';
+                const extra = (typeof e.data !== 'undefined') ? e.data : (typeof e.data_raw !== 'undefined' ? e.data_raw : null);
+                const hasExtra = extra !== null && extra !== '';
+                const rawText = typeof extra === 'string' ? extra : JSON.stringify(extra, null, 2);
+                const extraText = colorizeJSON(rawText);
+
+                return `
+                <div class="log-row">
+                    <span class="log-ts">${esc(date)}</span>
+                    <span class="log-level ${lvlCls}">${lvlTxt}</span>
+                    <span class="log-src">${esc(src)}</span>
+                    <span class="log-msg">${esc(msg)}</span>
+                    ${hasExtra ? `<button class="log-toggle">Detalles</button>` : ''}
+                    ${hasExtra ? `<pre class="log-data" style="display:none;"><code>${extraText}</code></pre>` : ''}
+                </div>`;
+            }).join('');
+            container.innerHTML = html;
+        } catch (err) {
+            container.textContent = 'Error al renderizar logs';
+        }
+    }
 }
 
 // ============================================
@@ -737,8 +1108,12 @@ class GreenhouseApp {
         // Subscribe to state changes
         appState.subscribe(state => this.onStateChange(state));
 
-        // Check if authenticated
+        // Setup WebSocket handlers
+        this.setupWebSocketHandlers();
+
+        // Connect WebSocket if authenticated
         if (!!appState.getState().apiToken) {
+            wsManager.connect(appState.getState().apiToken);
             this.ui.updateControlView();
         }
 
@@ -753,7 +1128,7 @@ class GreenhouseApp {
             await this.updateRelays();
         }
 
-        // Start polling
+        // Start polling (fallback for when WebSocket disconnects)
         this.startPolling();
 
     // App initialized log removed
@@ -789,7 +1164,6 @@ class GreenhouseApp {
             });
 
             this.ui.updateSensorDisplay(data);
-            this.ui.drawEnvironmentChart(history);
         } catch (error) {
             console.error('Failed to update sensors:', error);
             appState.setState({ isConnected: false });
@@ -825,9 +1199,85 @@ class GreenhouseApp {
         try {
             const data = await api.getLogs();
             appState.setState({ logs: data });
+            this.ui?.renderLogs?.(data);
         } catch (error) {
             console.error('Failed to update logs:', error);
         }
+    }
+
+    setupWebSocketHandlers() {
+        // Handle real-time sensor updates
+        wsManager.on('sensors', (data) => {
+            const state = appState.getState();
+            const history = [...state.sensors.history, data].slice(-CONFIG.CHART_MAX_POINTS);
+            appState.setState({
+                sensors: { ...data, history },
+                lastUpdate: Date.now()
+            });
+            this.ui.updateSensorDisplay(data);
+        });
+
+        // Handle real-time relay state updates
+        wsManager.on('relayState', (data) => {
+            const state = appState.getState();
+            if (state.relays && state.relays.relays) {
+                // Update specific relay in state
+                const relays = {...state.relays};
+                relays.relays[data.relay] = {
+                    ...relays.relays[data.relay],
+                    is_on: data.is_on,
+                    mode: data.mode
+                };
+                appState.setState({ relays });
+                this.ui.updateRelaysDisplay(relays);
+            }
+            // Notify relay manager if active
+            if (window.relayManager) {
+                window.relayManager.refreshRelay(data.relay);
+            }
+        });
+
+        // Handle relay mode updates
+        wsManager.on('relayMode', (data) => {
+            const state = appState.getState();
+            if (state.relays && state.relays.relays) {
+                const relays = {...state.relays};
+                relays.relays[data.relay] = {
+                    ...relays.relays[data.relay],
+                    mode: data.mode
+                };
+                appState.setState({ relays });
+                this.ui.updateRelaysDisplay(relays);
+            }
+            if (window.relayManager) {
+                window.relayManager.refreshRelay(data.relay);
+            }
+        });
+
+        // Handle rule events
+        wsManager.on('ruleEvent', (data) => {
+            console.log('[Rule Event]', data);
+            this.ui.showAlert(`Regla activada: ${data.rule} → ${data.action}`, 'info');
+        });
+
+        // Handle system status updates
+        wsManager.on('systemStatus', (data) => {
+            appState.setState({ system: data });
+            this.ui.updateSystemDisplay(data);
+        });
+
+        // Handle connection events
+        wsManager.on('connected', () => {
+            console.log('[WS] Connected');
+            appState.setState({ isConnected: true });
+            this.ui.showAlert('Conexión WebSocket establecida', 'success');
+        });
+
+        wsManager.on('disconnected', () => {
+            console.log('[WS] Disconnected');
+            appState.setState({ isConnected: false });
+            this.ui.showAlert('Conexión WebSocket perdida, reintentando...', 'warning');
+        });
     }
 
     startPolling() {

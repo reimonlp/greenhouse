@@ -5,12 +5,14 @@
 #include "sensors.h"
 #include "relays.h"
 #include <ESPAsyncWebServer.h>
+#include <AsyncWebSocket.h>
 #include <ArduinoJson.h>
 #include <IPAddress.h>
 
 class APIManager {
 private:
     AsyncWebServer* server;
+    AsyncWebSocket* ws;
     String authToken;
     unsigned long requestCount;
     unsigned long lastResetTime;
@@ -42,9 +44,20 @@ public:
     bool checkRateLimit(AsyncWebServerRequest* request);
     void resetRateLimit();
     
+    // WebSocket broadcasting
+    void broadcastSensorData();
+    void broadcastRelayState(int relayId);
+    void broadcastSystemStatus();
+    void broadcastRuleEvent(int relayId, const String& ruleName, const String& action);
+    void sendToClient(uint32_t clientId, const String& message);
+    
 private:
     // Handlers de endpoints
     void setupRoutes();
+    void setupWebSocket();
+    void handleWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
+                             AwsEventType type, void *arg, uint8_t *data, size_t len);
+    void handleWebSocketMessage(AsyncWebSocketClient *client, uint8_t *data, size_t len);
     
     // Endpoints de sensores
     void handleGetSensors(AsyncWebServerRequest* request);
@@ -55,6 +68,13 @@ private:
     void handleSetRelay(AsyncWebServerRequest* request);
     void handleSetRelayMode(AsyncWebServerRequest* request);
     void handleSetAutoRule(AsyncWebServerRequest* request);
+    
+    // Endpoints de reglas
+    void handleGetRelayRules(AsyncWebServerRequest* request);
+    void handleAddRelayRule(AsyncWebServerRequest* request);
+    void handleUpdateRelayRule(AsyncWebServerRequest* request);
+    void handleDeleteRelayRule(AsyncWebServerRequest* request);
+    void handleClearRelayRules(AsyncWebServerRequest* request);
     
     // Endpoints de sistema
     void handleGetSystemStatus(AsyncWebServerRequest* request);
@@ -87,6 +107,9 @@ private:
     
     // CORS y headers
     void setCORSHeaders(AsyncWebServerResponse* response);
+    
+    // Body handling
+    String getRequestBody(AsyncWebServerRequest* request);
     
     String lastError;
 

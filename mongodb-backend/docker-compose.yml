@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: greenhouse-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: greenhouse123
+      MONGO_INITDB_DATABASE: invernadero
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - greenhouse-net
+
+  api:
+    image: node:20-alpine
+    container_name: greenhouse-api
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://admin:greenhouse123@mongodb:27017/invernadero?authSource=admin
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./api:/app
+    command: sh -c "npm install --production && node server.js"
+    depends_on:
+      - mongodb
+    networks:
+      - greenhouse-net
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  greenhouse-net:
+    driver: bridge

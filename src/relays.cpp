@@ -1,12 +1,14 @@
 #include "relays.h"
 #include "system.h"
 #include "database.h"
+#include "api.h"
 #include <Preferences.h>
 #include <time.h>
 #include "time_source.h"
 #include "relay_timeouts.h"
 #include "relay_state_store.h"
 #include "nvs_utils.h"
+#include "rule_engine.h"
 
 RelayManager relays;
 
@@ -137,6 +139,9 @@ bool RelayManager::setRelay(int relayIndex, bool state) {
     DEBUG_PRINTF("R%s[%d]=%s %s\n", relayName(relayIndex).c_str(), relayIndex, state?"ON":"OFF", reason.c_str());
 #endif
     
+    // Broadcast state change via WebSocket
+    api.broadcastRelayState(relayIndex);
+    
     return true;
 }
 
@@ -148,6 +153,12 @@ bool RelayManager::toggleRelay(int relayIndex) {
 bool RelayManager::getRelayState(int relayIndex) {
     if (relayIndex < 0 || relayIndex >= 4) return false;
     return relayStates[relayIndex].is_on;
+}
+
+RelayState RelayManager::getRelayStateStruct(int relayIndex) {
+    static RelayState empty = {false, RELAY_MODE_MANUAL, 0, 0, ""};
+    if (relayIndex < 0 || relayIndex >= 4) return empty;
+    return relayStates[relayIndex];
 }
 
 bool RelayManager::setRelayMode(int relayIndex, RelayMode mode) {
@@ -165,6 +176,9 @@ bool RelayManager::setRelayMode(int relayIndex, RelayMode mode) {
 #if MIN_LOG_LEVEL <= LOG_INFO
     DEBUG_PRINTF("R%s mode %s\n", relayName(relayIndex).c_str(), modeStr.c_str());
 #endif
+    
+    // Broadcast mode change via WebSocket
+    api.broadcastRelayState(relayIndex);
     
     return true;
 }
@@ -285,87 +299,24 @@ void RelayManager::processAutoRules() {
     SensorData sensorData = sensors.getCurrentData();
     if (!sensorData.valid) return;
 
-    // Obtener hora/minuto actuales una sola vez
-    time_t nowTs = system_manager.getCurrentTimestamp();
-    struct tm* ti = localtime(&nowTs);
-    int hour = ti ? ti->tm_hour : 0;
-    int minute = ti ? ti->tm_min : 0;
-
-    float avgSoil = (sensorData.soil_moisture_1 + sensorData.soil_moisture_2) / 2.0f;
-
+    // Evaluate rules for each relay in auto mode using new rule engine
     for (int i = 0; i < 4; ++i) {
-        if (relayStates[i].mode != RELAY_MODE_AUTO || !autoRules[i].enabled) continue;
-        AutoRule& ar = autoRules[i];
-        // Reset ventana horaria si cambió la hora
-        if (ar.hourlyWindowHour != hour) {
-            ar.hourlyWindowHour = hour;
-            ar.hourlyEvalCount = 0;
-            ar.hourlyActivationCount = 0;
-        }
-        // Gestionar ventana deslizante 60m (6 buckets de 10m)
-        unsigned long minutesNow = (timeSource().millis()/60000UL);
-        if (ar.bucketBaseMinutes == 0) {
-            ar.bucketBaseMinutes = minutesNow - (minutesNow % 10); // alineado a bloque de 10m
-        }
-        // Calcular cuántos bloques de 10m han pasado desde base
-        uint32_t blocksElapsed = (minutesNow - ar.bucketBaseMinutes)/10;
-        if (blocksElapsed > 0) {
-            if (blocksElapsed >= 6) {
-                // Reset completo (pasó >60m)
-                for (int b=0;b<6;++b){ ar.evalBuckets[b]=0; ar.actBuckets[b]=0; }
-                ar.currentBucket = 0;
-                ar.bucketBaseMinutes = minutesNow - (minutesNow % 10);
-            } else {
-                // Avanzar bucket a bucket
-                for (uint32_t step=0; step<blocksElapsed; ++step) {
-                    ar.currentBucket = (ar.currentBucket + 1) % 6;
-                    ar.evalBuckets[ar.currentBucket] = 0;
-                    ar.actBuckets[ar.currentBucket] = 0;
+        if (relayStates[i].mode != RELAY_MODE_AUTO) continue;
+        
+        RuleAction action;
+        if (ruleEngine.evaluateRules(i, sensorData, action)) {
+            // Rule matched - execute action
+            bool target_state = (action.type == ActionType::TURN_ON);
+            
+            if (target_state != relayStates[i].is_on) {
+                setRelay(i, target_state);
+                
+                // Handle duration-based actions
+                if (action.duration_min > 0 && target_state) {
+                    // Schedule auto-off after duration (handled by relay timeouts)
+                    // TODO: Add relay timeout mechanism for duration-based rules
                 }
-                ar.bucketBaseMinutes += blocksElapsed*10; // avanzar base
             }
-        }
-        RuleDefinition rd;
-        rd.enabled = ar.enabled;
-        rd.type = ar.type.c_str();
-        rd.condition = ar.condition.c_str();
-        rd.value1 = ar.value1;
-        rd.value2 = ar.value2;
-        rd.schedule = ar.schedule.c_str();
-        rd.duration = ar.duration;
-        rd.lastActivation = ar.lastActivation;
-        rd.isActive = ar.isActive;
-
-        RuleEvalContext ctx;
-        ctx.temperature = sensorData.temperature;
-        ctx.humidity = sensorData.humidity;
-        ctx.soilMoistureAvg = avgSoil;
-    ctx.millisNow = timeSource().millis();
-        ctx.currentHour = hour;
-        ctx.currentMinute = minute;
-
-        bool shouldActivate = evaluateRule(rd, ctx, relayStates[i].is_on);
-        ar.evalCount++;
-        ar.hourlyEvalCount++;
-        ar.evalBuckets[ar.currentBucket]++;
-        ar.lastEvalAt = ctx.millisNow;
-        ar.lastDecision = shouldActivate;
-
-        if (shouldActivate && !relayStates[i].is_on) {
-            setRelay(i, true);
-            ar.lastActivation = rd.lastActivation = timeSource().millis();
-            ar.isActive = true;
-            ar.activationCount++;
-            ar.hourlyActivationCount++;
-            ar.actBuckets[ar.currentBucket]++;
-        } else if (!shouldActivate && relayStates[i].is_on && ar.isActive) {
-            setRelay(i, false);
-            ar.isActive = false;
-        }
-        // Timer rule: update lastActivation if still on (engine logic uses lastActivation only when toggling)
-        if (ar.isActive && ar.type == "timer") {
-            // Keep rd.lastActivation mirrored
-            ar.lastActivation = rd.lastActivation;
         }
     }
 }

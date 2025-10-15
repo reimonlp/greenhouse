@@ -1,16 +1,12 @@
 #include "sensors.h"
 #include "system.h"
-#include <OneWire.h>
-#include <DallasTemperature.h>
+// External temperature sensors removed
 
 SensorManager sensors;
 
 SensorManager::SensorManager() {
     dht = nullptr;
-    oneWire1 = nullptr;
-    oneWire2 = nullptr;
-    tempSensor1 = nullptr;
-    tempSensor2 = nullptr;
+    // External temperature sensor pointers removed
     
     lastReadTime = 0;
     soilMoisture1Offset = 0.0;
@@ -19,16 +15,13 @@ SensorManager::SensorManager() {
     bufferFull = false;
     
     // Inicializar datos
-    currentData = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, false};
+    currentData = {0.0, 0.0, 0.0, 0.0, 0, false};
     lastValidData = currentData;
 }
 
 SensorManager::~SensorManager() {
     if (dht) delete dht;
-    if (oneWire1) delete oneWire1;
-    if (oneWire2) delete oneWire2;
-    if (tempSensor1) delete tempSensor1;
-    if (tempSensor2) delete tempSensor2;
+    // External temperature sensor clean-up removed
 }
 
 bool SensorManager::begin() {
@@ -42,17 +35,7 @@ bool SensorManager::begin() {
     // Tiempo de estabilización inicial completo
     delay(dhtCurrentStabilizeMs);
     
-    // Inicializar sensores de temperatura DS18B20 (si no están deshabilitados)
-#ifndef FEATURE_DISABLE_EXT_TEMPS
-    oneWire1 = new OneWire(TEMP_SENSOR_1_PIN);
-    tempSensor1 = new DallasTemperature(oneWire1);
-    tempSensor1->begin();
-    tempSensor1->setResolution(TEMP_SENSOR_PRECISION);
-    oneWire2 = new OneWire(TEMP_SENSOR_2_PIN);
-    tempSensor2 = new DallasTemperature(oneWire2);
-    tempSensor2->begin();
-    tempSensor2->setResolution(TEMP_SENSOR_PRECISION);
-#endif
+    // NTC/DS18B20 removed
     
     // Configurar pines ADC para sensores de humedad de suelo
     analogReadResolution(12); // 12-bit ADC
@@ -80,11 +63,6 @@ bool SensorManager::readSensors() {
     newData.timestamp = system_manager.getCurrentTimestamp();
     newData.valid = false; // se establecerá en base al DHT (opción B)
     lastSoilComplete = false; // se recalcula cada ciclo
-#ifndef FEATURE_DISABLE_EXT_TEMPS
-    lastExtTempsComplete = false;
-#else
-    lastExtTempsComplete = true;
-#endif
     lastDhtValid = false;
     
     // Leer DHT (temperatura y humedad ambiental)
@@ -157,44 +135,7 @@ bool SensorManager::readSensors() {
     }
     
     // Conversión DS18B20 (omitida si deshabilitado)
-#ifndef FEATURE_DISABLE_EXT_TEMPS
-    if (!ds18InProgress) {
-        tempSensor1->requestTemperatures();
-        tempSensor2->requestTemperatures();
-        ds18InProgress = true;
-        ds18StartMs = millis();
-    }
-    bool dsReady = (millis() - ds18StartMs) >= ds18ConversionMs;
-    if (dsReady) {
-        float temp1 = tempSensor1->getTempCByIndex(0);
-        if (temp1 == DEVICE_DISCONNECTED_C) {
-            lastError = "Temperature sensor 1 disconnected";
-            newData.temp_sensor_1 = lastValidData.temp_sensor_1;
-            newData.valid = false;
-        } else {
-            newData.temp_sensor_1 = temp1;
-        }
-        float temp2 = tempSensor2->getTempCByIndex(0);
-        if (temp2 == DEVICE_DISCONNECTED_C) {
-            lastError = "Temperature sensor 2 disconnected";
-            newData.temp_sensor_2 = lastValidData.temp_sensor_2;
-            newData.valid = false;
-        } else {
-            newData.temp_sensor_2 = temp2;
-        }
-        ds18InProgress = false; // listo para próxima ronda
-        lastExtTempsComplete = true;
-    } else {
-        // Reusar valores previos mientras termina conversión
-        newData.temp_sensor_1 = lastValidData.temp_sensor_1;
-        newData.temp_sensor_2 = lastValidData.temp_sensor_2;
-        // mantener valid (basado en DHT) aunque externo no esté listo
-    }
-#else
-    // Cuando está deshabilitado, mantener datos previos y marcarlos como válidos (no disponibles)
-    newData.temp_sensor_1 = 0.0f;
-    newData.temp_sensor_2 = 0.0f;
-#endif
+    // External temperature acquisition removed
     
     // Si hay un muestreo no bloqueante en curso, intentar completarlo; si no, iniciar
     if (!soilState.active) {
@@ -313,8 +254,7 @@ bool SensorManager::isDataValid(const SensorData& data) {
     if (data.humidity < 0.0 || data.humidity > 100.0) return false;
     if (data.soil_moisture_1 < 0.0 || data.soil_moisture_1 > 100.0) return false;
     if (data.soil_moisture_2 < 0.0 || data.soil_moisture_2 > 100.0) return false;
-    if (data.temp_sensor_1 < -40.0 || data.temp_sensor_1 > 80.0) return false;
-    if (data.temp_sensor_2 < -40.0 || data.temp_sensor_2 > 80.0) return false;
+    // External temperature validation removed
     
     return true;
 }

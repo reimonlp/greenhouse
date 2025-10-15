@@ -3,16 +3,12 @@
 
 #include "config.h"
 #include <DHT.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+// External temperature sensors (NTC/DS18B20) removed
 
 class SensorManager {
 private:
     DHT* dht;
-    OneWire* oneWire1;
-    OneWire* oneWire2;
-    DallasTemperature* tempSensor1;
-    DallasTemperature* tempSensor2;
+    // External temperature sensor members removed
     
     SensorData currentData;
     SensorData lastValidData;
@@ -47,7 +43,7 @@ private:
     // Flags de validez por subsistema
     bool lastDhtValid = false;
     bool lastSoilComplete = false;
-    bool lastExtTempsComplete = true; // si están deshabilitados, considerar completo
+    // External temperature completeness removed
     
 public:
     SensorManager();
@@ -59,7 +55,7 @@ public:
     uint16_t getCurrentDhtStabilizeMs() const { return dhtCurrentStabilizeMs; }
     bool isDhtValid() const { return lastDhtValid; }
     bool isSoilComplete() const { return lastSoilComplete; }
-    bool areExtTempsComplete() const { return lastExtTempsComplete; }
+    // NTC completeness removed
     // Nueva versión incremental no bloqueante; devuelve true cuando se completó la adquisición de ambos sensores
     bool updateSoilSampling();
     SensorData getCurrentData();

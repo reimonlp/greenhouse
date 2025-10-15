@@ -9,8 +9,7 @@
 
 // Sensores
 #define DHT_PIN               23  // GPIO23 → DHT11 sensor
-#define TEMP_SENSOR_1_PIN     32  // GPIO32
-#define TEMP_SENSOR_2_PIN     33  // GPIO33
+// External temperature sensor pins removed (NTC/DS18B20 not used)
 #define SOIL_MOISTURE_1_PIN   34  // GPIO34 (input only)
 #define SOIL_MOISTURE_2_PIN   35  // GPIO35 (input only)
 

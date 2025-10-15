@@ -179,8 +179,7 @@ $ curl http://10.0.0.104/api/sensors
   "humidity": 76,
   "soil_moisture_1": 0,
   "soil_moisture_2": 0,
-  "temp_sensor_1": 0,
-  "temp_sensor_2": 0,
+   // temp_sensor_1/2 eliminados
   "flags": { "dht": true, ... }
 }
 ```

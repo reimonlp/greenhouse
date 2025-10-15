@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <vector>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <LittleFS.h>
 #include "fs_utils.h"
 
@@ -278,8 +279,7 @@ void DatabaseManager::logSensorData(const SensorData& data) {
     doc["humidity"] = data.humidity;
     doc["soil_moisture_1"] = data.soil_moisture_1;
     doc["soil_moisture_2"] = data.soil_moisture_2;
-    doc["temp_sensor_1"] = data.temp_sensor_1;
-    doc["temp_sensor_2"] = data.temp_sensor_2;
+    // External temperatures removed
     doc["valid"] = data.valid;
     
     String jsonData;
@@ -414,61 +414,68 @@ bool DatabaseManager::sendSystemStats(const SystemStats& stats) {
 bool DatabaseManager::sendToMongoDB(const String& collection, const String& jsonData) {
 #if defined(USE_MONGODB_DATA_API)
     if (!isConnected()) return false;
-    if (MONGODB_DATA_API_KEY[0] == '\0' || MONGODB_APP_ID[0] == '\0') { lastError = "Data API not configured"; return false; }
+    // Simplified for local server: POST directly to /api/logs or /api/sensors
     HTTPClient http;
-    String url = String("https://data.mongodb-api.com/app/") + MONGODB_APP_ID + "/endpoint/data/v1/action/insertOne";
-    http.begin(url);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("api-key", MONGODB_DATA_API_KEY);
-    StaticJsonDocument<512> doc;
-    doc["dataSource"] = MONGODB_DATA_SOURCE;
-    doc["database"] = MONGODB_DB_NAME;
-    doc["collection"] = collection;
-    // Parse original payload to embed (si falla, se guarda como raw)
-    StaticJsonDocument<512> payload;
-    if (deserializeJson(payload, jsonData) == DeserializationError::Ok) {
-        doc["document"] = payload;
+    String endpoint = (collection == collectionLogs) ? "/api/logs" : "/api/sensors";
+    String url = String(MONGODB_DATA_API_BASE) + endpoint;
+    
+    // Use WiFiClient (HTTP) if URL starts with http://, else WiFiClientSecure (HTTPS)
+    if (url.startsWith("https://")) {
+        WiFiClientSecure client;
+        client.setInsecure();
+        http.begin(client, url);
     } else {
-        doc["document"]["raw"] = jsonData;
-        doc["document"]["ts"] = getCurrentTimestamp();
+        http.begin(url);
     }
-    String body; serializeJson(doc, body);
-    int code = http.POST(body);
-    if (code == 200 || code == 201) { http.end(); return true; }
-    lastError = String("Data API insert error: ") + code;
-    http.end(); return false;
+    
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(10000);
+    
+    // Send JSON payload as-is (API expects flat document)
+    int code = http.POST(jsonData);
+    http.end();
+    
+    if (code == 200 || code == 201) return true;
+    lastError = String("Server error: ") + code;
+    return false;
 #else
-    (void)collection; (void)jsonData; return false; // Data API no habilitada
+    (void)collection; (void)jsonData; return false;
 #endif
 }
 
 String DatabaseManager::queryFromMongoDB(const String& collection, const String& query) {
 #if defined(USE_MONGODB_DATA_API)
     if (!isConnected()) return "{}";
-    if (MONGODB_DATA_API_KEY[0] == '\0' || MONGODB_APP_ID[0] == '\0') return "{}";
+    // Simplified for local server: GET /api/logs?count=N or /api/sensors?from=X&to=Y
     HTTPClient http;
-    String url = String("https://data.mongodb-api.com/app/") + MONGODB_APP_ID + "/endpoint/data/v1/action/find";
-    http.begin(url);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("api-key", MONGODB_DATA_API_KEY);
-    StaticJsonDocument<512> doc;
-    doc["dataSource"] = MONGODB_DATA_SOURCE;
-    doc["database"] = MONGODB_DB_NAME;
-    doc["collection"] = collection;
-    // query es un JSON parcial con filtros. Intentar parsear
+    String endpoint = (collection == collectionLogs) ? "/api/logs" : "/api/sensors";
+    String url = String(MONGODB_DATA_API_BASE) + endpoint;
+    
+    // Parse query for params
     StaticJsonDocument<256> qdoc;
     if (deserializeJson(qdoc, query) == DeserializationError::Ok) {
-        doc["filter"] = qdoc["filter"] | qdoc;
-        if (qdoc["limit"]) doc["limit"] = qdoc["limit"];
-        if (qdoc["sort"]) doc["sort"] = qdoc["sort"];
+        if (qdoc.containsKey("limit")) {
+            url += "?count=" + String(qdoc["limit"].as<int>());
+        }
     } else {
-        doc["limit"] = 20;
+        url += "?count=50"; // default
     }
-    String body; serializeJson(doc, body);
-    int code = http.POST(body);
+    
+    if (url.startsWith("https://")) {
+        WiFiClientSecure client;
+        client.setInsecure();
+        http.begin(client, url);
+    } else {
+        http.begin(url);
+    }
+    
+    http.setTimeout(10000);
+    int code = http.GET();
     String out = "{}";
-    if (code == 200) out = http.getString(); else lastError = String("Data API find error:") + code;
-    http.end(); return out;
+    if (code == 200) out = http.getString();
+    else lastError = String("Server GET error: ") + code;
+    http.end();
+    return out;
 #else
     (void)collection; (void)query; return "{}";
 #endif
@@ -656,8 +663,7 @@ String DatabaseManager::createSensorJSON(const SensorData& data) {
     doc["humidity"] = data.humidity;
     doc["soil_moisture_1"] = data.soil_moisture_1;
     doc["soil_moisture_2"] = data.soil_moisture_2;
-    doc["temp_sensor_1"] = data.temp_sensor_1;
-    doc["temp_sensor_2"] = data.temp_sensor_2;
+    // External temperatures removed
     doc["valid"] = data.valid;
     
     String result;

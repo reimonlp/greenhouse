@@ -70,8 +70,7 @@ La mayoría de los endpoints requieren autenticación mediante token Bearer o pa
   "humidity": 60.0,
   "soil_moisture_1": 45.0,
   "soil_moisture_2": 50.0,
-  "temp_sensor_1": 24.5,
-  "temp_sensor_2": 26.0,
+  // temp_sensor_1/2 eliminados
   "flags": {
     "dht": true,
     "soil_complete": true,

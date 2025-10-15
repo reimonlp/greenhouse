@@ -8,6 +8,7 @@
 #include "pins.h"
 #include <LittleFS.h>
 #include "fs_utils.h"
+#include "rule_engine.h"
 
 // Global rate limiter instance (window 60s, max requests per config) placed before route lambdas
 static RateLimiter<RATE_LIMIT_SLOTS> gRateLimiter(60000UL, MAX_API_REQUESTS);
@@ -16,6 +17,7 @@ APIManager api;
 
 APIManager::APIManager() {
     server = nullptr;
+    ws = nullptr;
     authToken = API_TOKEN;
     requestCount = 0;
     lastResetTime = 0;
@@ -26,6 +28,7 @@ APIManager::APIManager() {
 }
 
 APIManager::~APIManager() {
+    if (ws) delete ws;
     if (server) delete server;
 }
 
@@ -76,6 +79,9 @@ bool APIManager::begin() {
     }
     
     server = new AsyncWebServer(API_PORT);
+    
+    // Configurar WebSocket
+    setupWebSocket();
     
     // Configurar rutas de la API
     setupRoutes();
@@ -130,6 +136,50 @@ void APIManager::setupRoutes() {
     server->on("/api/relays/rule", HTTP_POST, [this](AsyncWebServerRequest *request) {
         handleSetAutoRule(request);
     });
+    #endif
+    
+    // ========== ENDPOINTS DE REGLAS ==========
+    #ifndef FEATURE_MINIMAL_API
+    // GET /api/relays/X/rules - List all rules for relay
+    server->on("/api/relays/0/rules", HTTP_GET, [this](AsyncWebServerRequest *r) { 
+        DEBUG_PRINTLN("GET /api/relays/0/rules called");
+        handleGetRelayRules(r); 
+    });
+    server->on("/api/relays/1/rules", HTTP_GET, [this](AsyncWebServerRequest *r) { handleGetRelayRules(r); });
+    server->on("/api/relays/2/rules", HTTP_GET, [this](AsyncWebServerRequest *r) { handleGetRelayRules(r); });
+    server->on("/api/relays/3/rules", HTTP_GET, [this](AsyncWebServerRequest *r) { handleGetRelayRules(r); });
+    
+    // POST /api/relays/X/rules - Add new rule (with body handler)
+    server->on("/api/relays/0/rules", HTTP_POST, [this](AsyncWebServerRequest *r) { handleAddRelayRule(r); },
+               NULL, [this](AsyncWebServerRequest *r, uint8_t *data, size_t len, size_t index, size_t total) {
+                   appendBodyChunk(r, data, len, index, total);
+               });
+    server->on("/api/relays/1/rules", HTTP_POST, [this](AsyncWebServerRequest *r) { handleAddRelayRule(r); },
+               NULL, [this](AsyncWebServerRequest *r, uint8_t *data, size_t len, size_t index, size_t total) {
+                   appendBodyChunk(r, data, len, index, total);
+               });
+    server->on("/api/relays/2/rules", HTTP_POST, [this](AsyncWebServerRequest *r) { handleAddRelayRule(r); },
+               NULL, [this](AsyncWebServerRequest *r, uint8_t *data, size_t len, size_t index, size_t total) {
+                   appendBodyChunk(r, data, len, index, total);
+               });
+    server->on("/api/relays/3/rules", HTTP_POST, [this](AsyncWebServerRequest *r) { handleAddRelayRule(r); },
+               NULL, [this](AsyncWebServerRequest *r, uint8_t *data, size_t len, size_t index, size_t total) {
+                   appendBodyChunk(r, data, len, index, total);
+               });
+    
+    // DELETE /api/relays/X/rules - Clear all rules
+    server->on("/api/relays/0/rules", HTTP_DELETE, [this](AsyncWebServerRequest *r) { handleClearRelayRules(r); });
+    server->on("/api/relays/1/rules", HTTP_DELETE, [this](AsyncWebServerRequest *r) { handleClearRelayRules(r); });
+    server->on("/api/relays/2/rules", HTTP_DELETE, [this](AsyncWebServerRequest *r) { handleClearRelayRules(r); });
+    server->on("/api/relays/3/rules", HTTP_DELETE, [this](AsyncWebServerRequest *r) { handleClearRelayRules(r); });
+    
+    // PUT/DELETE for individual rules with wildcard (with body handler for PUT)
+    server->on("^\\/api\\/relays\\/\\d+\\/rules\\/\\d+$", HTTP_PUT, 
+               [this](AsyncWebServerRequest *r) { handleUpdateRelayRule(r); },
+               NULL, [this](AsyncWebServerRequest *r, uint8_t *data, size_t len, size_t index, size_t total) {
+                   appendBodyChunk(r, data, len, index, total);
+               });
+    server->on("^\\/api\\/relays\\/\\d+\\/rules\\/\\d+$", HTTP_DELETE, [this](AsyncWebServerRequest *r) { handleDeleteRelayRule(r); });
     #endif
     
     // ========== ENDPOINTS DEL SISTEMA ==========
@@ -368,7 +418,6 @@ void APIManager::setupRoutes() {
     #endif
     
     // ========== ENDPOINTS DE LOGS ==========
-    #ifndef FEATURE_MINIMAL_API
     server->on("/api/logs", HTTP_GET, [this](AsyncWebServerRequest *request) {
         handleGetLogs(request);
     });
@@ -388,7 +437,6 @@ void APIManager::setupRoutes() {
     server->on("/api/logs/clear", HTTP_DELETE, [this](AsyncWebServerRequest *request) {
         handleClearLogs(request);
     });
-    #endif
     
     // ========== ENDPOINTS DE OTA ==========
     #ifndef FEATURE_MINIMAL_API
@@ -520,14 +568,12 @@ void APIManager::handleGetSensors(AsyncWebServerRequest* request) {
     doc["humidity"] = data.humidity;
     doc["soil_moisture_1"] = data.soil_moisture_1;
     doc["soil_moisture_2"] = data.soil_moisture_2;
-    doc["temp_sensor_1"] = data.temp_sensor_1;
-    doc["temp_sensor_2"] = data.temp_sensor_2;
+        // External temperatures removed
     // Flags detallados
     JsonObject flags = doc.createNestedObject("flags");
     flags["dht"] = sensors.isDhtValid();
     flags["soil_complete"] = sensors.isSoilComplete();
-    flags["ext_temps_complete"] = sensors.areExtTempsComplete();
-    flags["overall_complete"] = sensors.isDhtValid() && sensors.isSoilComplete() && sensors.areExtTempsComplete();
+        flags["overall_complete"] = sensors.isDhtValid() && sensors.isSoilComplete();
     
     // Agregar estadísticas
     SystemStats stats = sensors.getStatistics();
@@ -904,8 +950,9 @@ void APIManager::handleGetLogs(AsyncWebServerRequest* request) {
         count = request->getParam("count")->value().toInt();
         count = constrain(count, 1, 1000);
     }
-    
-    String logs = database.getLocalLogs(count);
+
+    // Prefer cloud when available, fallback to local
+    String logs = database.getRecentLogs(count);
     sendJSONResponse(request, 200, logs);
 }
 
@@ -1109,4 +1156,395 @@ void APIManager::computeTokenHash() {
     for (size_t i=0;i<authToken.length(); ++i) authTokenHash[i%32]^=authToken[i];
 #endif
     tokenHashed = true;
+}
+
+String APIManager::getRequestBody(AsyncWebServerRequest* request) {
+    // Return accumulated body from restoreBuf (populated by appendBodyChunk)
+    if (restoreLen > 0 && restoreLen < RESTORE_BUF_MAX) {
+        return String(restoreBuf, restoreLen);
+    }
+    return "";
+}
+
+// ============================================
+// Rule Engine API Handlers
+// ============================================
+
+#ifndef FEATURE_MINIMAL_API
+
+void APIManager::handleGetRelayRules(AsyncWebServerRequest* request) {
+    if (!validateToken(request)) { sendErrorResponse(request, 401, "Unauthorized"); return; }
+    
+    // Extract relay_id from path params
+    String path = request->url();
+    int relay_id = -1;
+    if (sscanf(path.c_str(), "/api/relays/%d/rules", &relay_id) != 1 || relay_id < 0 || relay_id >= 4) {
+        sendErrorResponse(request, 400, "Invalid relay ID");
+        return;
+    }
+    
+    String rules_json = ruleEngine.exportRules(relay_id);
+    sendJSONResponse(request, 200, rules_json);
+}
+
+void APIManager::handleAddRelayRule(AsyncWebServerRequest* request) {
+    if (!validateToken(request)) { sendErrorResponse(request, 401, "Unauthorized"); return; }
+    
+    String path = request->url();
+    int relay_id = -1;
+    if (sscanf(path.c_str(), "/api/relays/%d/rules", &relay_id) != 1 || relay_id < 0 || relay_id >= 4) {
+        sendErrorResponse(request, 400, "Invalid relay ID");
+        return;
+    }
+    
+    String body = getRequestBody(request);
+    if (body.isEmpty()) {
+        sendErrorResponse(request, 400, "Empty body");
+        return;
+    }
+    
+    DynamicJsonDocument doc(2048);
+    DeserializationError error = deserializeJson(doc, body);
+    if (error) {
+        sendErrorResponse(request, 400, "Invalid JSON");
+        return;
+    }
+    
+    Rule rule;
+    if (!rule.fromJson(doc.as<JsonObject>())) {
+        sendErrorResponse(request, 400, "Invalid rule format");
+        return;
+    }
+    
+    if (ruleEngine.addRule(relay_id, rule)) {
+        StaticJsonDocument<128> response;
+        response["success"] = true;
+        response["message"] = "Rule added successfully";
+        String out;
+        serializeJson(response, out);
+        sendJSONResponse(request, 201, out);
+    } else {
+        sendErrorResponse(request, 500, "Failed to add rule");
+    }
+}
+
+void APIManager::handleUpdateRelayRule(AsyncWebServerRequest* request) {
+    if (!validateToken(request)) { sendErrorResponse(request, 401, "Unauthorized"); return; }
+    
+    String path = request->url();
+    int relay_id = -1, rule_idx = -1;
+    if (sscanf(path.c_str(), "/api/relays/%d/rules/%d", &relay_id, &rule_idx) != 2 || 
+        relay_id < 0 || relay_id >= 4 || rule_idx < 0) {
+        sendErrorResponse(request, 400, "Invalid relay ID or rule index");
+        return;
+    }
+    
+    String body = getRequestBody(request);
+    if (body.isEmpty()) {
+        sendErrorResponse(request, 400, "Empty body");
+        return;
+    }
+    
+    DynamicJsonDocument doc(2048);
+    DeserializationError error = deserializeJson(doc, body);
+    if (error) {
+        sendErrorResponse(request, 400, "Invalid JSON");
+        return;
+    }
+    
+    Rule rule;
+    if (!rule.fromJson(doc.as<JsonObject>())) {
+        sendErrorResponse(request, 400, "Invalid rule format");
+        return;
+    }
+    
+    if (ruleEngine.updateRule(relay_id, rule_idx, rule)) {
+        StaticJsonDocument<128> response;
+        response["success"] = true;
+        response["message"] = "Rule updated successfully";
+        String out;
+        serializeJson(response, out);
+        sendJSONResponse(request, 200, out);
+    } else {
+        sendErrorResponse(request, 500, "Failed to update rule");
+    }
+}
+
+void APIManager::handleDeleteRelayRule(AsyncWebServerRequest* request) {
+    if (!validateToken(request)) { sendErrorResponse(request, 401, "Unauthorized"); return; }
+    
+    String path = request->url();
+    int relay_id = -1, rule_idx = -1;
+    if (sscanf(path.c_str(), "/api/relays/%d/rules/%d", &relay_id, &rule_idx) != 2 || 
+        relay_id < 0 || relay_id >= 4 || rule_idx < 0) {
+        sendErrorResponse(request, 400, "Invalid relay ID or rule index");
+        return;
+    }
+    
+    if (ruleEngine.deleteRule(relay_id, rule_idx)) {
+        StaticJsonDocument<128> response;
+        response["success"] = true;
+        response["message"] = "Rule deleted successfully";
+        String out;
+        serializeJson(response, out);
+        sendJSONResponse(request, 200, out);
+    } else {
+        sendErrorResponse(request, 404, "Rule not found or failed to delete");
+    }
+}
+
+void APIManager::handleClearRelayRules(AsyncWebServerRequest* request) {
+    if (!validateToken(request)) { sendErrorResponse(request, 401, "Unauthorized"); return; }
+    
+    String path = request->url();
+    int relay_id = -1;
+    if (sscanf(path.c_str(), "/api/relays/%d/rules", &relay_id) != 1 || relay_id < 0 || relay_id >= 4) {
+        sendErrorResponse(request, 400, "Invalid relay ID");
+        return;
+    }
+    
+    if (ruleEngine.clearRules(relay_id)) {
+        StaticJsonDocument<128> response;
+        response["success"] = true;
+        response["message"] = "All rules cleared successfully";
+        String out;
+        serializeJson(response, out);
+        sendJSONResponse(request, 200, out);
+    } else {
+        sendErrorResponse(request, 500, "Failed to clear rules");
+    }
+}
+
+#endif // FEATURE_MINIMAL_API
+
+// ============================================
+// WebSocket Implementation
+// ============================================
+
+void APIManager::setupWebSocket() {
+    ws = new AsyncWebSocket("/ws");
+    
+    ws->onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client, 
+                       AwsEventType type, void *arg, uint8_t *data, size_t len) {
+        this->handleWebSocketEvent(server, client, type, arg, data, len);
+    });
+    
+    server->addHandler(ws);
+    DEBUG_PRINTLN(F("WebSocket configured on /ws"));
+}
+
+void APIManager::handleWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+                                     AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    switch (type) {
+        case WS_EVT_CONNECT:
+            DEBUG_PRINTLN(String(F("WebSocket client #")) + String(client->id()) + F(" connected"));
+            // Send current state to new client
+            {
+                StaticJsonDocument<512> doc;
+                doc["type"] = "connected";
+                doc["clientId"] = client->id();
+                doc["timestamp"] = millis();
+                String output;
+                serializeJson(doc, output);
+                client->text(output);
+            }
+            break;
+            
+        case WS_EVT_DISCONNECT:
+            DEBUG_PRINTLN(String(F("WebSocket client #")) + String(client->id()) + F(" disconnected"));
+            break;
+            
+        case WS_EVT_ERROR:
+            DEBUG_PRINTLN(String(F("WebSocket client #")) + String(client->id()) + F(" error"));
+            break;
+            
+        case WS_EVT_DATA:
+            handleWebSocketMessage(client, data, len);
+            break;
+            
+        case WS_EVT_PONG:
+            // Pong received
+            break;
+    }
+}
+
+void APIManager::handleWebSocketMessage(AsyncWebSocketClient *client, uint8_t *data, size_t len) {
+    // Parse incoming JSON message
+    StaticJsonDocument<512> doc; // Reduced from DynamicJsonDocument(1024)
+    DeserializationError error = deserializeJson(doc, data, len);
+    
+    if (error) {
+        return; // Removed debug logging to save flash
+    }
+    
+    const char* type = doc["type"];
+    if (!type) {
+        return; // Removed debug logging to save flash
+    }
+    
+    // Authenticate WebSocket commands that modify state
+    const char* token = doc["token"];
+    bool authenticated = (token && String(token) == authToken);
+    
+    DynamicJsonDocument response(512);
+    response["requestId"] = doc["id"] | 0;
+    
+    if (strcmp(type, "ping") == 0) {
+        // Ping-pong for keepalive
+        response["type"] = "pong";
+        response["timestamp"] = millis();
+        
+    } else if (strcmp(type, "getSensors") == 0) {
+        // Send current sensor data
+        SensorData data = sensors.getCurrentData();
+        response["type"] = "sensors";
+        response["temp"] = data.temperature;
+        response["humidity"] = data.humidity;
+        response["soil"] = data.soil_moisture_1;
+        response["timestamp"] = millis();
+        
+    } else if (strcmp(type, "getRelays") == 0) {
+        // Send current relay states
+        response["type"] = "relays";
+        JsonArray relays = response.createNestedArray("data");
+        for (int i = 0; i < 4; i++) {
+            JsonObject relay = relays.createNestedObject();
+            relay["id"] = i;
+            relay["is_on"] = ::relays.getRelayState(i);
+            relay["mode"] = ::relays.getRelayMode(i) == RELAY_MODE_AUTO ? "auto" : "manual";
+        }
+        response["timestamp"] = millis();
+        
+    } else if (strcmp(type, "setRelay") == 0) {
+        if (!authenticated) {
+            response["type"] = "error";
+            response["error"] = "Unauthorized";
+        } else {
+            int relayId = doc["relay"] | -1;
+            bool state = doc["state"] | false;
+            
+            if (relayId >= 0 && relayId < 4) {
+                ::relays.setRelay(relayId, state);
+                response["type"] = "relayState";
+                response["relay"] = relayId;
+                response["is_on"] = state;
+                response["success"] = true;
+                
+                // Broadcast to all clients
+                broadcastRelayState(relayId);
+            } else {
+                response["type"] = "error";
+                response["error"] = "Invalid relay ID";
+            }
+        }
+        
+    } else if (strcmp(type, "setRelayMode") == 0) {
+        if (!authenticated) {
+            response["type"] = "error";
+            response["error"] = "Unauthorized";
+        } else {
+            int relayId = doc["relay"] | -1;
+            const char* mode = doc["mode"];
+            
+            if (relayId >= 0 && relayId < 4 && mode) {
+                RelayMode newMode = (strcmp(mode, "auto") == 0) ? RELAY_MODE_AUTO : RELAY_MODE_MANUAL;
+                ::relays.setRelayMode(relayId, newMode);
+                response["type"] = "relayMode";
+                response["relay"] = relayId;
+                response["mode"] = mode;
+                response["success"] = true;
+                
+                // Broadcast to all clients
+                broadcastRelayState(relayId);
+            } else {
+                response["type"] = "error";
+                response["error"] = "Invalid parameters";
+            }
+        }
+        
+    } else if (strcmp(type, "subscribe") == 0) {
+        // Client wants to subscribe to real-time updates
+        response["type"] = "subscribed";
+        response["streams"] = doc["streams"]; // Echo back what they subscribed to
+        
+    } else {
+        response["type"] = "error";
+        response["error"] = "Unknown message type";
+    }
+    
+    // Send response back to client
+    String output;
+    serializeJson(response, output);
+    client->text(output);
+}
+
+// Broadcast functions
+void APIManager::broadcastSensorData() {
+    if (!ws) return;
+    
+    SensorData data = sensors.getCurrentData();
+    StaticJsonDocument<256> doc;
+    doc["type"] = "sensors";
+    doc["temp"] = data.temperature;
+    doc["humidity"] = data.humidity;
+    doc["soil"] = data.soil_moisture_1;
+    doc["timestamp"] = millis();
+    
+    String output;
+    serializeJson(doc, output);
+    ws->textAll(output);
+}
+
+void APIManager::broadcastRelayState(int relayId) {
+    if (!ws || relayId < 0 || relayId >= 4) return;
+    
+    StaticJsonDocument<256> doc;
+    doc["type"] = "relayState";
+    doc["relay"] = relayId;
+    doc["is_on"] = ::relays.getRelayState(relayId);
+    doc["mode"] = ::relays.getRelayMode(relayId) == RELAY_MODE_AUTO ? "auto" : "manual";
+    doc["timestamp"] = millis();
+    
+    String output;
+    serializeJson(doc, output);
+    ws->textAll(output);
+}
+
+void APIManager::broadcastSystemStatus() {
+    if (!ws) return;
+    
+    StaticJsonDocument<512> doc;
+    doc["type"] = "systemStatus";
+    doc["uptime"] = system_manager.getUptime();
+    doc["freeHeap"] = ESP.getFreeHeap();
+    doc["wifiRSSI"] = WiFi.RSSI();
+    doc["timestamp"] = millis();
+    
+    String output;
+    serializeJson(doc, output);
+    ws->textAll(output);
+}
+
+void APIManager::broadcastRuleEvent(int relayId, const String& ruleName, const String& action) {
+    if (!ws) return;
+    
+    StaticJsonDocument<256> doc;
+    doc["type"] = "ruleEvent";
+    doc["relay"] = relayId;
+    doc["rule"] = ruleName;
+    doc["action"] = action;
+    doc["timestamp"] = millis();
+    
+    String output;
+    serializeJson(doc, output);
+    ws->textAll(output);
+}
+
+void APIManager::sendToClient(uint32_t clientId, const String& message) {
+    if (!ws) return;
+    
+    AsyncWebSocketClient* client = ws->client(clientId);
+    if (client && client->status() == WS_CONNECTED) {
+        client->text(message);
+    }
 }
