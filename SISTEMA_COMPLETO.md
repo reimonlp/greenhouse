@@ -324,6 +324,89 @@ sudo journalctl -u mongod -f
 
 ---
 
+## 🔧 Configuración del Repositorio Git
+
+### ✅ Estado: COMPLETAMENTE SINCRONIZADO
+
+**Problemas Resueltos (Octubre 2025):**
+- ✅ `.gitignore` actualizado para excluir `node_modules/` (miles de archivos)
+- ✅ Conflictos de merge resueltos entre local y remoto
+- ✅ Rebase interrumpido limpiado
+- ✅ Permisos de archivos corregidos
+- ✅ Push exitoso a GitHub
+
+**Repositorio GitHub:**
+- Owner: reimonlp
+- Repo: greenhouse
+- Branch: main
+- Estado: `✅ Up to date with 'Github/main'`
+- Último commit: `1c8429c - Merge remote changes and resolve conflicts`
+
+**`.gitignore` Configurado:**
+```gitignore
+# PlatformIO
+.pio
+.vscode/
+
+# Secrets
+include/secrets.h
+
+# Node.js
+node_modules/
+greenhouse-dashboard/node_modules/
+mongodb-backend/node_modules/
+
+# Build outputs
+greenhouse-dashboard/dist/
+greenhouse-dashboard/build/
+mongodb-backend/dist/
+mongodb-backend/build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cleanup backup
+.cleanup_backup/
+
+# Python
+.venv/
+```
+
+**Comandos Git Útiles:**
+```bash
+# Ver estado
+git status
+
+# Hacer commit
+git add .
+git commit -m "Mensaje descriptivo"
+
+# Sincronizar con GitHub
+git pull Github main
+git push Github main
+
+# Ver últimos commits
+git log --oneline -5
+```
+
+---
+
 **Sistema 100% funcional y listo para producción! 🚀**
 
-Solo falta subir el frontend cuando recuperes la contraseña del VPS.
+- ✅ **Backend VPS**: Operacional
+- ✅ **ESP32 Firmware**: Operacional
+- ✅ **Frontend Build**: Listo para deploy
+- ✅ **Git Repository**: Sincronizado con GitHub
+- 🔑 **Pendiente**: Subir frontend al VPS cuando recuperes la contraseña
