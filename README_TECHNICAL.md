@@ -36,7 +36,7 @@
 
 Sistema de control de invernadero con:
 - 4 relays (2x 220V, 2x 12V) para actuadores
-- Sensores ambientales (DHT11, DS18B20, humedad suelo)
+- Sensores ambientales (DHT11, humedad suelo)
 - API REST con autenticación
 - Dashboard web embebido en LittleFS
 - Logging local + remoto opcional (MongoDB)
@@ -47,7 +47,7 @@ Sistema de control de invernadero con:
 
 ```cpp
 #define MAX_RELAYS 4
-#define MAX_SENSORS 6  // DHT11 + 2xDS18B20 + 2xSoil
+#define MAX_SENSORS 4  // DHT11 + 2xSoil
 #define API_PORT 80
 #define RATE_LIMIT_SLOTS 32
 #define MAX_API_REQUESTS 100  // Por ventana de 60s
@@ -85,7 +85,7 @@ Sistema de control de invernadero con:
 │ (sensors.cpp)│   │(relays.cpp)  │   │  (api.cpp)   │
 │              │   │              │   │              │
 │ • DHT11      │   │ • State mgmt │   │ • REST routes│
-│ • DS18B20    │   │ • Timeouts   │   │ • Auth       │
+│ • Humedad    │   │ • Timeouts   │   │ • Auth       │
 │ • Soil ADC   │   │ • Auto rules │   │ • Rate limit │
 └──────────────┘   └──────────────┘   └──────────────┘
          ↓                    ↓                   ↓
@@ -147,8 +147,7 @@ GPIO 34, 35, 36, 37, 38, 39
 #define RELAY_PIN_3 19  // Bomba 12V
 
 #define DHT_PIN 23
-#define TEMP_SENSOR_1_PIN 32  // DS18B20 o analógico
-#define TEMP_SENSOR_2_PIN 33  // DS18B20 o analógico
+// Pines para sensores externos eliminados (NTC/DS18B20 no usados)
 #define SOIL_SENSOR_1_PIN 34  // ADC1_CH6 (input-only)
 #define SOIL_SENSOR_2_PIN 35  // ADC1_CH7 (input-only)
 
@@ -159,7 +158,7 @@ GPIO 34, 35, 36, 37, 38, 39
 **Razón de la asignación:**
 - GPIOs 16-19: Agrupados, sin strapping, salidas estables
 - GPIO 23: Libre de conflictos, no usado por periféricos
-- GPIO 32-33: ADC2, pero compatible con DS18B20 digital
+- GPIO 32-33 ya no se usan para sensores externos
 - GPIO 34-35: ADC1 exclusivo (WiFi no interfiere), input-only ideal para sensores pasivos
 - GPIO 4: INPUT_PULLUP confiable, lejos de strapping
 - GPIO 2: LED integrado en placa (ya soldado)
@@ -413,12 +412,11 @@ GET /metrics                    # Prometheus format
   "humidity": 76.0,             // % (null si error)
   "soil_moisture_1": 45.5,      // % (null si error)
   "soil_moisture_2": 38.2,
-  "temp_sensor_1": 21.5,        // °C DS18B20
-  "temp_sensor_2": 23.0,
+  // Campos temp_sensor_1/temp_sensor_2 eliminados
   "flags": {
     "dht": true,                // DHT11 funcionando
     "soil_complete": true,      // Ambos sensores suelo OK
-    "ext_temps_complete": true, // Ambos DS18B20 OK
+  // ext_temps_complete eliminado
     "overall_complete": true    // Todo OK
   },
   "statistics": {
@@ -512,8 +510,7 @@ struct RelayStateRecord {
   humidity: 76.0,
   soil_moisture_1: 45.5,
   soil_moisture_2: 38.2,
-  temp_sensor_1: 21.5,
-  temp_sensor_2: 23.0,
+  // temp_sensor_1/2 eliminados
   flags: { dht: true, soil_complete: true, ext_temps_complete: true }
 }
 
@@ -845,7 +842,7 @@ Sistema diseñado para operar **7+ días sin intervención humana** con toleranc
 
 **Justificación:**
 - WiFi reconnect puede tardar 15-30s en redes inestables
-- Conversión DS18B20: ~750ms por sensor
+- Conversión DS18B20: eliminado
 - Filesystem operations (format): >30s
 - Operaciones lentas no son crashes
 
