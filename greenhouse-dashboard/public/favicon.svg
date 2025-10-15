@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Greenhouse structure -->
+  <defs>
+    <linearGradient id="glassGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8f5e9;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#c8e6c9;stop-opacity:0.8" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Base -->
+  <rect x="15" y="75" width="70" height="20" fill="#795548" rx="2"/>
+  
+  <!-- Greenhouse walls -->
+  <path d="M 20 75 L 20 45 L 50 20 L 80 45 L 80 75 Z" fill="url(#glassGradient)" stroke="#4CAF50" stroke-width="2"/>
+  
+  <!-- Roof lines -->
+  <line x1="50" y1="20" x2="50" y2="75" stroke="#66BB6A" stroke-width="1.5" opacity="0.6"/>
+  <line x1="20" y1="45" x2="80" y2="45" stroke="#66BB6A" stroke-width="1.5" opacity="0.6"/>
+  <line x1="35" y1="32.5" x2="35" y2="75" stroke="#66BB6A" stroke-width="1" opacity="0.4"/>
+  <line x1="65" y1="32.5" x2="65" y2="75" stroke="#66BB6A" stroke-width="1" opacity="0.4"/>
+  
+  <!-- Door -->
+  <rect x="42" y="55" width="16" height="20" fill="#8D6E63" rx="1"/>
+  <circle cx="54" cy="65" r="1.5" fill="#FFF59D"/>
+  
+  <!-- Plant inside -->
+  <ellipse cx="30" cy="65" rx="4" ry="6" fill="#4CAF50"/>
+  <ellipse cx="70" cy="65" rx="4" ry="6" fill="#4CAF50"/>
+  <path d="M 30 65 Q 32 60 35 58" stroke="#388E3C" stroke-width="1.5" fill="none"/>
+  <path d="M 70 65 Q 68 60 65 58" stroke="#388E3C" stroke-width="1.5" fill="none"/>
+  
+  <!-- Sun -->
+  <circle cx="85" cy="15" r="6" fill="#FFC107" opacity="0.9"/>
+  <circle cx="85" cy="15" r="3" fill="#FFD54F"/>
+</svg>
