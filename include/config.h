@@ -67,10 +67,18 @@
 #define MONGODB_DATA_API_KEY ""  // define en secrets.h
 #endif
 #ifndef MONGODB_APP_ID
-#define MONGODB_APP_ID ""
+#define MONGODB_APP_ID ""  // p.ej. "data-xxxxx"
 #endif
 #ifndef MONGODB_DATA_SOURCE
 #define MONGODB_DATA_SOURCE "Cluster0"
+#endif
+#ifndef MONGODB_DATA_API_BASE
+// Si usás servidor local, definirlo en secrets.h como MONGODB_DATA_API_BASE_LOCAL
+#ifdef MONGODB_DATA_API_BASE_LOCAL
+#define MONGODB_DATA_API_BASE MONGODB_DATA_API_BASE_LOCAL
+#else
+#define MONGODB_DATA_API_BASE "https://data.mongodb-api.com" // fallback Atlas (si se usa)
+#endif
 #endif
 #ifndef MONGODB_DB_NAME
 #define MONGODB_DB_NAME "invernadero"
@@ -182,8 +190,7 @@ struct SensorData {
     float humidity;
     float soil_moisture_1;
     float soil_moisture_2;
-    float temp_sensor_1;
-    float temp_sensor_2;
+    // External temp sensors removed
     unsigned long timestamp;
     bool valid;
 };

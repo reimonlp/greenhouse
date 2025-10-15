@@ -32,3 +32,9 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Cleanup backup (archivos obsoletos)
+.cleanup_backup/
+
+# Python virtual environment
+.venv/
