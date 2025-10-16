@@ -13,6 +13,17 @@ VPSWebSocketClient::VPSWebSocketClient() {
     _relayCommandCallback = nullptr;
     _sensorRequestCallback = nullptr;
     _instance = this;
+    _startTime = millis();
+    
+    // Initialize metrics
+    _metrics.totalConnections = 0;
+    _metrics.authFailures = 0;
+    _metrics.reconnections = 0;
+    _metrics.messagesReceived = 0;
+    _metrics.messagesSent = 0;
+    _metrics.uptimeSeconds = 0;
+    _metrics.lastConnectionTime = 0;
+    _metrics.totalDisconnections = 0;
 }
 
 bool VPSWebSocketClient::begin() {
@@ -88,16 +99,25 @@ void VPSWebSocketClient::webSocketEvent(WStype_t type, uint8_t * payload, size_t
 
 void VPSWebSocketClient::handleConnected() {
     _connected = true;
+    _metrics.totalConnections++;
+    _metrics.lastConnectionTime = millis();
+    if (_metrics.totalConnections > 1) {
+        _metrics.reconnections++;
+    }
     DEBUG_PRINTLN("✓ WebSocket connected to VPS!");
 }
 
 void VPSWebSocketClient::handleDisconnected() {
     _connected = false;
+    _metrics.totalDisconnections++;
     DEBUG_PRINTLN("✗ WebSocket disconnected from VPS");
 }
 
 void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
-    if (length < 1) return;
+    // Increment received messages counter
+    _metrics.messagesReceived++;
+    
+    if (length == 0) return;
     
     char packetType = payload[0];
     
@@ -161,6 +181,7 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
             _authFailed = true;
             _authFailureCount++;
             _lastAuthAttempt = millis();
+            _metrics.authFailures++;  // Track auth failures in metrics
             
             // Calcular backoff exponencial: 30s, 60s, 120s, 240s, max 5 minutos
             unsigned long backoffDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
@@ -288,8 +309,35 @@ bool VPSWebSocketClient::sendLog(const char* level, const char* message) {
     return true;
 }
 
+bool VPSWebSocketClient::sendMetrics(const ConnectionMetrics& metrics) {
+    if (!_connected) {
+        return false;
+    }
+    
+    StaticJsonDocument<384> data;
+    data["totalConnections"] = metrics.totalConnections;
+    data["authFailures"] = metrics.authFailures;
+    data["reconnections"] = metrics.reconnections;
+    data["messagesReceived"] = metrics.messagesReceived;
+    data["messagesSent"] = metrics.messagesSent;
+    data["uptimeSeconds"] = metrics.uptimeSeconds;
+    data["lastConnectionTime"] = metrics.lastConnectionTime;
+    data["totalDisconnections"] = metrics.totalDisconnections;
+    
+    String payload = "42[\"metrics\",";
+    serializeJson(data, payload);
+    payload += "]";
+    
+    _webSocket.sendTXT(payload);
+    
+    return true;
+}
+
 void VPSWebSocketClient::sendEvent(const char* event, JsonDocument& data) {
     if (!_connected) return;
+    
+    // Increment sent messages counter
+    _metrics.messagesSent++;
     
     String payload = "42[\"";
     payload += event;
@@ -306,6 +354,12 @@ void VPSWebSocketClient::onRelayCommand(RelayCommandCallback callback) {
 
 void VPSWebSocketClient::onSensorRequest(SensorRequestCallback callback) {
     _sensorRequestCallback = callback;
+}
+
+ConnectionMetrics VPSWebSocketClient::getMetrics() {
+    // Update uptime
+    _metrics.uptimeSeconds = (millis() - _startTime) / 1000;
+    return _metrics;
 }
 
 String VPSWebSocketClient::getStatus() {

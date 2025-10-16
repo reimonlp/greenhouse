@@ -27,6 +27,7 @@ VPSWebSocketClient vpsWebSocket;
 // Timers
 unsigned long lastSensorSend = 0;
 unsigned long lastHealthCheck = 0;
+unsigned long lastMetricsSend = 0;
 
 // Status tracking
 bool vpsConnected = false;
@@ -34,6 +35,7 @@ int failedRequests = 0;
 const int MAX_FAILED_REQUESTS = 5;
 
 void sendSensorData();
+void sendMetrics();
 
 // WebSocket callbacks
 void onRelayCommand(int relayId, bool state) {
@@ -217,6 +219,35 @@ void sendSensorData() {
     }
 }
 
+void sendMetrics() {
+    // Send metrics every 5 minutes
+    if (millis() - lastMetricsSend < 300000) {
+        return;
+    }
+    lastMetricsSend = millis();
+    
+    if (!vpsWebSocket.isConnected()) {
+        return;
+    }
+    
+    ConnectionMetrics metrics = vpsWebSocket.getMetrics();
+    
+    DEBUG_PRINTLN("\n=== Sending Connection Metrics ===");
+    DEBUG_PRINTF("Total Connections: %lu\n", metrics.totalConnections);
+    DEBUG_PRINTF("Reconnections: %lu\n", metrics.reconnections);
+    DEBUG_PRINTF("Auth Failures: %lu\n", metrics.authFailures);
+    DEBUG_PRINTF("Messages Sent: %lu\n", metrics.messagesSent);
+    DEBUG_PRINTF("Messages Received: %lu\n", metrics.messagesReceived);
+    DEBUG_PRINTF("Uptime: %lu seconds\n", metrics.uptimeSeconds);
+    
+    bool success = vpsWebSocket.sendMetrics(metrics);
+    if (success) {
+        DEBUG_PRINTLN("✓ Metrics sent");
+    } else {
+        DEBUG_PRINTLN("✗ Failed to send metrics");
+    }
+}
+
 void setup() {
     DEBUG_SERIAL_BEGIN(115200);
     delay(1000);
@@ -296,6 +327,7 @@ void loop() {
     vpsWebSocket.loop();
     checkVPSHealth();
     sendSensorData();
+    sendMetrics();
     delay(10);
     yield();
 }

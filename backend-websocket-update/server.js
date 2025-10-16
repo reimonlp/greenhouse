@@ -273,6 +273,18 @@ io.on('connection', (socket) => {
     socket.emit('pong', { timestamp: new Date() });
   });
   
+  // ESP32 metrics reporting
+  socket.on('metrics', (data) => {
+    // Store metrics on socket for access via health endpoint
+    if (socket.authenticated && socket.deviceType === 'esp32') {
+      socket.metrics = data;
+      // Log significant metrics updates
+      if (data.authFailures > 0 || data.reconnections > 5) {
+        console.log(`📊 [METRICS] ${socket.deviceId} - Reconnections: ${data.reconnections}, Auth Failures: ${data.authFailures}, Uptime: ${data.uptimeSeconds}s`);
+      }
+    }
+  });
+  
   socket.on('disconnect', () => {
     // Clean up rate limit data for this socket
     socketRateLimits.delete(socket.id);
@@ -364,7 +376,8 @@ app.get('/health', async (req, res) => {
       .filter(socket => socket.authenticated && socket.deviceType === 'esp32')
       .map(socket => ({
         device_id: socket.deviceId,
-        connected_at: socket.handshake.time
+        connected_at: socket.handshake.time,
+        metrics: socket.metrics || null
       }));
     
     // Get memory usage

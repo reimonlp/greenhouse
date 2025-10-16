@@ -11,6 +11,18 @@
 typedef void (*RelayCommandCallback)(int relayId, bool state);
 typedef void (*SensorRequestCallback)();
 
+// Connection metrics structure
+struct ConnectionMetrics {
+    unsigned long totalConnections;
+    unsigned long authFailures;
+    unsigned long reconnections;
+    unsigned long messagesReceived;
+    unsigned long messagesSent;
+    unsigned long uptimeSeconds;
+    unsigned long lastConnectionTime;
+    unsigned long totalDisconnections;
+};
+
 class VPSWebSocketClient {
 public:
     VPSWebSocketClient();
@@ -24,6 +36,7 @@ public:
     bool sendSensorData(float temperature, float humidity, float soilMoisture = -1);
     bool sendRelayState(int relayId, bool state, const char* mode = "manual", const char* changedBy = "esp32");
     bool sendLog(const char* level, const char* message);
+    bool sendMetrics(const ConnectionMetrics& metrics);
     
     // Set callbacks for incoming commands
     void onRelayCommand(RelayCommandCallback callback);
@@ -31,6 +44,9 @@ public:
     
     // Get connection status
     String getStatus();
+    
+    // Get connection metrics
+    ConnectionMetrics getMetrics();
 
 private:
     WebSocketsClient _webSocket;
@@ -46,6 +62,10 @@ private:
     // Callbacks
     RelayCommandCallback _relayCommandCallback;
     SensorRequestCallback _sensorRequestCallback;
+    
+    // Connection metrics
+    ConnectionMetrics _metrics;
+    unsigned long _startTime;
     
     // WebSocket event handler
     static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
