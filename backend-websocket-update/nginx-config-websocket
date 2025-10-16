@@ -1,0 +1,100 @@
+# Configuración de Nginx para reimon.dev/greenhouse con WebSocket
+# Ubicación: /etc/nginx/sites-available/reimon.dev
+
+server {
+    server_name reimon.dev www.reimon.dev;
+
+    # Logs
+    access_log /var/log/nginx/reimon.dev.access.log;
+    error_log /var/log/nginx/reimon.dev.error.log;
+
+    # Redirect /greenhouse to /greenhouse/
+    location = /greenhouse {
+        return 301 https://$host/greenhouse/;
+    }
+
+    # API Backend con soporte WebSocket
+    location /greenhouse/api/ {
+        proxy_pass http://localhost:3000/api/;
+        proxy_http_version 1.1;
+        
+        # Headers estándar
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Headers para WebSocket
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Timeouts para WebSocket
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+        proxy_connect_timeout 86400;
+        
+        proxy_cache_bypass $http_upgrade;
+        
+        # CORS headers
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+    }
+
+    # Socket.IO WebSocket endpoint
+    location /greenhouse/socket.io/ {
+        proxy_pass http://localhost:3000/socket.io/;
+        proxy_http_version 1.1;
+        
+        # Headers para WebSocket
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Headers estándar
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeouts largos para WebSocket
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+        proxy_connect_timeout 86400;
+        
+        # Buffering off para WebSocket
+        proxy_buffering off;
+        
+        # CORS
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+    }
+
+    # Frontend (React build en /var/www/greenhouse)
+    location /greenhouse/ {
+        alias /var/www/greenhouse/;
+        index index.html;
+        try_files $uri $uri/ /greenhouse/index.html;
+    }
+
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/reimon.dev/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/reimon.dev/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    if ($host = www.reimon.dev) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    if ($host = reimon.dev) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    listen [::]:80;
+    server_name reimon.dev www.reimon.dev;
+    return 404; # managed by Certbot
+}

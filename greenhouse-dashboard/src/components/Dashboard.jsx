@@ -8,22 +8,43 @@ import {
   Toolbar,
   Paper,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Chip
 } from '@mui/material';
-import { Thermostat, Opacity, WaterDrop } from '@mui/icons-material';
+import { Thermostat, Opacity, WaterDrop, WifiOff, Wifi } from '@mui/icons-material';
 import SensorCard from './SensorCard';
 import RelayControl from './RelayControl';
 import RuleManager from './RuleManager';
 import SensorChart from './SensorChart';
 import LogViewer from './LogViewer';
 import { getLatestSensorReading, getRelayStates } from '../services/api';
+import { useWebSocket, useSensorUpdates, useRelayUpdates } from '../hooks/useWebSocket';
 
 function Dashboard() {
   const [sensorData, setSensorData] = useState(null);
   const [relayStates, setRelayStates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // WebSocket hooks
+  const { isConnected } = useWebSocket();
+  const latestSensor = useSensorUpdates();
+  const wsRelayStates = useRelayUpdates();
 
+  // Actualizar datos cuando llegan por WebSocket
+  useEffect(() => {
+    if (latestSensor) {
+      setSensorData(latestSensor);
+    }
+  }, [latestSensor]);
+
+  useEffect(() => {
+    if (wsRelayStates.length > 0) {
+      setRelayStates(wsRelayStates);
+    }
+  }, [wsRelayStates]);
+
+  // Cargar datos iniciales
   const fetchData = async () => {
     try {
       setError(null);
@@ -50,11 +71,7 @@ function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    
-    // Refresh every 5 seconds
-    const interval = setInterval(fetchData, 5000);
-    
-    return () => clearInterval(interval);
+    // Ya no necesitamos polling porque WebSocket actualiza en tiempo real
   }, []);
 
   const handleRelayToggle = async () => {
@@ -85,6 +102,13 @@ function Dashboard() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Greenhouse Monitor
           </Typography>
+          <Chip 
+            icon={isConnected ? <Wifi /> : <WifiOff />}
+            label={isConnected ? "Conectado" : "Desconectado"}
+            color={isConnected ? "success" : "error"}
+            size="small"
+            sx={{ mr: 2 }}
+          />
           <Typography variant="body2">
             {new Date().toLocaleString('es-AR', { hour12: false })}
           </Typography>
