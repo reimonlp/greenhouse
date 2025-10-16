@@ -30,6 +30,52 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ====== WebSocket Rate Limiting Configuration ======
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX_EVENTS = 120;  // 120 events per minute per socket
+
+// Rate limiter storage: Map of socket.id -> { count, resetTime }
+const socketRateLimits = new Map();
+
+function checkSocketRateLimit(socket, eventName) {
+  const now = Date.now();
+  const socketId = socket.id;
+  
+  // Get or create rate limit data for this socket
+  let limitData = socketRateLimits.get(socketId);
+  
+  if (!limitData || now > limitData.resetTime) {
+    // Create new window
+    limitData = {
+      count: 0,
+      resetTime: now + RATE_LIMIT_WINDOW_MS
+    };
+    socketRateLimits.set(socketId, limitData);
+  }
+  
+  // Increment counter
+  limitData.count++;
+  
+  // Check if limit exceeded
+  if (limitData.count > RATE_LIMIT_MAX_EVENTS) {
+    const timeUntilReset = Math.ceil((limitData.resetTime - now) / 1000);
+    console.log(`🚨 [RATE_LIMIT] Socket ${socketId} exceeded limit on event '${eventName}' (${limitData.count}/${RATE_LIMIT_MAX_EVENTS}). Reset in ${timeUntilReset}s`);
+    return false; // Rate limit exceeded
+  }
+  
+  return true; // Within limits
+}
+
+// Cleanup old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [socketId, data] of socketRateLimits.entries()) {
+    if (now > data.resetTime + 60000) { // Clean up 1 minute after reset
+      socketRateLimits.delete(socketId);
+    }
+  }
+}, 120000); // Clean up every 2 minutes
+
 // ====== Crear servidor HTTP ======
 const server = http.createServer(app);
 
@@ -105,6 +151,15 @@ io.on('connection', (socket) => {
   
   // Sensor data from ESP32
   socket.on('sensor:data', async (data) => {
+    // Check rate limit
+    if (!checkSocketRateLimit(socket, 'sensor:data')) {
+      socket.emit('error', { 
+        message: 'Rate limit exceeded. Please slow down.',
+        code: 'RATE_LIMIT_EXCEEDED'
+      });
+      return;
+    }
+    
     // Check authentication
     if (!socket.authenticated) {
       console.log('🚨 [SECURITY] Unauthorized sensor:data attempt from:', socket.id);
@@ -133,6 +188,15 @@ io.on('connection', (socket) => {
   
   // Relay state update from ESP32
   socket.on('relay:state', async (data) => {
+    // Check rate limit
+    if (!checkSocketRateLimit(socket, 'relay:state')) {
+      socket.emit('error', { 
+        message: 'Rate limit exceeded. Please slow down.',
+        code: 'RATE_LIMIT_EXCEEDED'
+      });
+      return;
+    }
+    
     // Check authentication
     if (!socket.authenticated) {
       console.log('🚨 [SECURITY] Unauthorized relay:state attempt from:', socket.id);
@@ -178,6 +242,15 @@ io.on('connection', (socket) => {
   
   // Log from ESP32
   socket.on('log', async (data) => {
+    // Check rate limit
+    if (!checkSocketRateLimit(socket, 'log')) {
+      socket.emit('error', { 
+        message: 'Rate limit exceeded. Please slow down.',
+        code: 'RATE_LIMIT_EXCEEDED'
+      });
+      return;
+    }
+    
     // Only log warnings and errors from ESP32
     if (data.level === 'warn' || data.level === 'error') {
       console.log(`⚠️ [ESP32-${data.level.toUpperCase()}]`, data.message);
@@ -201,6 +274,9 @@ io.on('connection', (socket) => {
   });
   
   socket.on('disconnect', () => {
+    // Clean up rate limit data for this socket
+    socketRateLimits.delete(socket.id);
+    
     // Only log ESP32 device disconnections (important)
     if (socket.deviceId) {
       console.log('⚠️ [DISCONNECT] ESP32 device disconnected:', socket.deviceId);
@@ -307,6 +383,13 @@ app.get('/health', async (req, res) => {
     
     const uptimeFormatted = `${uptimeDays}d ${uptimeHours % 24}h ${uptimeMinutes % 60}m ${uptimeSeconds % 60}s`;
     
+    // Get rate limiting statistics
+    const rateLimitStats = {
+      trackedSockets: socketRateLimits.size,
+      maxEventsPerMinute: RATE_LIMIT_MAX_EVENTS,
+      windowMs: RATE_LIMIT_WINDOW_MS
+    };
+    
     res.json({
       status: 'ok',
       timestamp: new Date(),
@@ -321,7 +404,8 @@ app.get('/health', async (req, res) => {
       websocket: {
         totalConnections: io.sockets.sockets.size,
         authenticatedESP32: authenticatedDevices.length,
-        devices: authenticatedDevices
+        devices: authenticatedDevices,
+        rateLimit: rateLimitStats
       },
       memory: memoryMB,
       environment: process.env.NODE_ENV || 'development'
