@@ -141,7 +141,7 @@
 #define WATCHDOG_TIMEOUT_SEC    120
 
 // ========== CONFIGURACIÓN OTA ==========
-#define OTA_PASSWORD            "ota_password_123"
+// OTA_PASSWORD is now defined only in secrets.h
 #define OTA_PORT                3232
 
 // ========== CONFIGURACIÓN DE ALERTAS ==========

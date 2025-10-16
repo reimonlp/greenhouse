@@ -252,7 +252,7 @@ void setup() {
     DEBUG_PRINTLN("\n\n");
     DEBUG_PRINTLN("╔══════════════════════════════════════════════╗");
     DEBUG_PRINTLN("║  ESP32 Greenhouse - VPS Client Mode          ║");
-    DEBUG_PRINTLN("║  Firmware v2.2-ota - Cloud Connected         ║");
+    DEBUG_PRINTLN("║  Firmware v2.3-ota - OTA TEST SUCCESS! 🚀   ║");
     DEBUG_PRINTLN("╚══════════════════════════════════════════════╝");
     DEBUG_PRINTLN();
     

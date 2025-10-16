@@ -32,7 +32,7 @@
 
 // Device identification
 #define DEVICE_ID                   "ESP32_GREENHOUSE_01"
-#define FIRMWARE_VERSION            "2.2-ota"
+#define FIRMWARE_VERSION            "2.3-ota"
 
 // Security - Authentication token
 // MUST be defined in secrets.h - no default provided for security

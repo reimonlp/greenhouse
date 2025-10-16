@@ -2,7 +2,7 @@
 #define VPS_OTA_H
 
 // OTA Configuration
-#define OTA_ENABLED true
+#define OTA_ENABLED 1
 #define OTA_HOSTNAME "ESP32_GREENHOUSE_01"
 #define OTA_PORT 3232
 
