@@ -11,6 +11,9 @@ VPSWebSocketClient::VPSWebSocketClient() {
     _authFailed = false;
     _authFailureCount = 0;
     _lastAuthAttempt = 0;
+    _consecutiveFailures = 0;
+    _circuitBreakerOpen = false;
+    _circuitBreakerOpenTime = 0;
     _relayCommandCallback = nullptr;
     _sensorRequestCallback = nullptr;
     _instance = this;
@@ -47,6 +50,24 @@ bool VPSWebSocketClient::begin() {
 }
 
 void VPSWebSocketClient::loop() {
+    // Circuit breaker: stop trying if too many consecutive failures
+    if (_circuitBreakerOpen) {
+        unsigned long timeSinceOpen = millis() - _circuitBreakerOpenTime;
+        
+        if (timeSinceOpen >= CIRCUIT_BREAKER_TIMEOUT) {
+            // Try one test connection after timeout
+            if (timeSinceOpen % CIRCUIT_BREAKER_TEST_INTERVAL < 1000) {
+                LOG_INFOF("Circuit breaker: Testing connection (failure count: %d)\n", _consecutiveFailures);
+                _circuitBreakerOpen = false;
+                _consecutiveFailures = 0;  // Reset on test attempt
+            } else {
+                return;  // Still waiting
+            }
+        } else {
+            return;  // Circuit breaker still open
+        }
+    }
+    
     // Si hay fallo de autenticación, aplicar backoff exponencial con jitter
     if (_authFailed) {
         unsigned long baseDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
@@ -118,6 +139,11 @@ void VPSWebSocketClient::handleConnected() {
     _metrics.totalConnections++;
     _metrics.lastConnectionTime = millis() / 1000;
     _lastActivity = millis();  // Reset activity timer on new connection
+    
+    // Reset circuit breaker on successful connection
+    _consecutiveFailures = 0;
+    _circuitBreakerOpen = false;
+    
     if (_metrics.totalConnections > 1) {
         _metrics.reconnections++;
     }
@@ -127,6 +153,17 @@ void VPSWebSocketClient::handleConnected() {
 void VPSWebSocketClient::handleDisconnected() {
     _connected = false;
     _metrics.totalDisconnections++;
+    
+    // Increment consecutive failures for circuit breaker
+    _consecutiveFailures++;
+    
+    if (_consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+        _circuitBreakerOpen = true;
+        _circuitBreakerOpenTime = millis();
+        LOG_ERRORF("Circuit breaker OPEN: %d consecutive failures. Pausing for %lu seconds\n", 
+                   _consecutiveFailures, CIRCUIT_BREAKER_TIMEOUT / 1000);
+    }
+    
     DEBUG_PRINTLN("✗ WebSocket disconnected from VPS");
 }
 
@@ -192,6 +229,11 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
             DEBUG_PRINTLN("✓ Authentication successful");
             _authFailed = false;
             _authFailureCount = 0;
+            
+            // Reset circuit breaker on successful auth
+            _consecutiveFailures = 0;
+            _circuitBreakerOpen = false;
+            
             return;
         } else if (strcmp(eventName, "device:auth_failed") == 0) {
             DEBUG_PRINTLN("✗ Authentication FAILED - invalid token!");
