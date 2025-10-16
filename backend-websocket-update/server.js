@@ -40,8 +40,94 @@ io.on('connection', (socket) => {
     timestamp: new Date()
   });
   
+  // ====== ESP32 Device Events ======
+  
+  // Device registration
+  socket.on('device:register', async (data) => {
+    console.log('📱 ESP32 device registered:', data);
+    socket.deviceId = data.device_id;
+    socket.deviceType = data.device_type;
+    
+    // Join device room for targeted messages
+    socket.join('esp32_devices');
+    
+    await SystemLog.create({
+      level: 'info',
+      message: `ESP32 device ${data.device_id} connected via WebSocket`,
+      metadata: data
+    });
+  });
+  
+  // Sensor data from ESP32
+  socket.on('sensor:data', async (data) => {
+    console.log('📊 Sensor data from ESP32:', data);
+    
+    try {
+      const sensorReading = await SensorReading.create({
+        device_id: data.device_id || 'ESP32_GREENHOUSE_01',
+        temperature: data.temperature,
+        humidity: data.humidity,
+        soil_moisture: data.soil_moisture
+      });
+      
+      // Broadcast to all connected clients (dashboard)
+      io.emit('sensor:new', sensorReading);
+      
+      // Evaluate sensor-based rules
+      await evaluateSensorRules(sensorReading);
+    } catch (error) {
+      console.error('Error saving sensor data:', error);
+    }
+  });
+  
+  // Relay state update from ESP32
+  socket.on('relay:state', async (data) => {
+    console.log('🔌 Relay state from ESP32:', data);
+    
+    try {
+      const relayState = await RelayState.findOneAndUpdate(
+        { relay_id: data.relay_id },
+        {
+          state: data.state,
+          mode: data.mode || 'manual',
+          changed_by: data.changed_by || 'esp32',
+          timestamp: new Date()
+        },
+        { upsert: true, new: true }
+      );
+      
+      // Broadcast to all connected clients (dashboard)
+      io.emit('relay:changed', relayState);
+    } catch (error) {
+      console.error('Error updating relay state:', error);
+    }
+  });
+  
+  // Log from ESP32
+  socket.on('log', async (data) => {
+    console.log('📝 Log from ESP32:', data.message);
+    
+    try {
+      await SystemLog.create({
+        level: data.level || 'info',
+        message: data.message,
+        metadata: { device_id: data.device_id }
+      });
+    } catch (error) {
+      console.error('Error saving log:', error);
+    }
+  });
+  
+  // Ping/Pong for keepalive
+  socket.on('ping', (data) => {
+    socket.emit('pong', { timestamp: new Date() });
+  });
+  
   socket.on('disconnect', () => {
     console.log('✗ Cliente WebSocket desconectado:', socket.id);
+    if (socket.deviceId) {
+      console.log('  Device:', socket.deviceId);
+    }
   });
 });
 
@@ -188,8 +274,16 @@ app.post('/api/relays/:id/state', async (req, res) => {
       { upsert: true, new: true }
     );
     
-    // Emitir evento WebSocket con cambio de relay
+    // Emitir evento WebSocket con cambio de relay a dashboard
     io.emit('relay:changed', relayState);
+    
+    // Enviar comando al ESP32 via WebSocket
+    io.to('esp32_devices').emit('relay:command', {
+      relay_id: parseInt(id),
+      state: state
+    });
+    
+    console.log(`🔌 Relay command sent to ESP32: Relay ${id} -> ${state ? 'ON' : 'OFF'}`);
     
     await SystemLog.create({
       level: 'info',

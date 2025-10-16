@@ -1,5 +1,5 @@
-// ESP32 VPS Client - Versión simplificada para enviar datos al VPS
-// Sin AsyncWebServer, solo WiFi + HTTPClient
+// ESP32 VPS Client - Versión con WebSocket para comunicación en tiempo real
+// Sin AsyncWebServer, WiFi + WebSocket
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -7,6 +7,7 @@
 #include "config.h"
 #include "vps_config.h"
 #include "vps_client.h"
+#include "vps_websocket.h"
 #include "sensors.h"
 #include "relays.h"
 
@@ -15,18 +16,37 @@ extern SensorManager sensors;
 extern RelayManager relays;
 
 // Global instances
-VPSClient vpsClient;
+VPSClient vpsClient;  // Keep for initial HTTP setup
+VPSWebSocketClient vpsWebSocket;  // New WebSocket client
 
 // Timers
 unsigned long lastSensorSend = 0;
-unsigned long lastRelayPoll = 0;
-unsigned long lastRulesSync = 0;
 unsigned long lastHealthCheck = 0;
 
 // Status tracking
 bool vpsConnected = false;
 int failedRequests = 0;
 const int MAX_FAILED_REQUESTS = 5;
+
+// Forward declarations
+void sendSensorData();
+
+// WebSocket callbacks
+void onRelayCommandReceived(int relayId, bool state) {
+    DEBUG_PRINTF("\n=== Relay Command from WebSocket ===\n");
+    DEBUG_PRINTF("Relay %d -> %s\n", relayId, state ? "ON" : "OFF");
+    
+    // Apply relay state immediately
+    relays.setRelay(relayId, state);
+    
+    // Send confirmation back via WebSocket
+    vpsWebSocket.sendRelayState(relayId, state, "manual", "websocket");
+}
+
+void onSensorRequestReceived() {
+    DEBUG_PRINTLN("\n=== Sensor Request from WebSocket ===");
+    sendSensorData();
+}
 
 void setupWiFi() {
     DEBUG_PRINTLN("\n=== Starting WiFi Connection ===");
@@ -125,8 +145,8 @@ void sendSensorData() {
     DEBUG_PRINTF("Temperature: %.1f°C\n", temp);
     DEBUG_PRINTF("Humidity: %.1f%%\n", hum);
     
-    // Enviar al VPS
-    bool success = vpsClient.sendSensorData(temp, hum);
+    // Enviar al VPS via WebSocket
+    bool success = vpsWebSocket.sendSensorData(temp, hum);
     
     if (!success) {
         failedRequests++;
@@ -136,43 +156,7 @@ void sendSensorData() {
     }
 }
 
-void pollRelayStates() {
-    if (millis() - lastRelayPoll < RELAY_STATE_POLL_MS) {
-        return;
-    }
-    lastRelayPoll = millis();
-    
-    DEBUG_PRINTLN("\n=== Polling Relay States ===");
-    
-    bool states[4];
-    if (vpsClient.getRelayStates(states)) {
-        // Aplicar estados recibidos del VPS
-        for (int i = 0; i < 4; i++) {
-            relays.setRelay(i, states[i]);
-            DEBUG_PRINTF("Relay %d: %s\n", i, states[i] ? "ON" : "OFF");
-        }
-    } else {
-        failedRequests++;
-    }
-}
-
-void syncRules() {
-    if (millis() - lastRulesSync < RULES_SYNC_INTERVAL_MS) {
-        return;
-    }
-    lastRulesSync = millis();
-    
-    DEBUG_PRINTLN("\n=== Syncing Rules ===");
-    
-    String rulesJson = vpsClient.getRules();
-    if (rulesJson.isEmpty()) {
-        DEBUG_PRINTLN("✗ Failed to sync rules");
-        failedRequests++;
-    } else {
-        DEBUG_PRINTLN("✓ Rules synced successfully");
-        // Rules are executed on the VPS server
-    }
-}
+// No more polling needed! WebSocket handles relay commands in real-time
 
 void setup() {
     DEBUG_SERIAL_BEGIN(115200);
@@ -203,15 +187,40 @@ void setup() {
     
     if (vpsConnected) {
         DEBUG_PRINTLN("✓ Connected to VPS successfully");
+    } else {
+        DEBUG_PRINTLN("⚠ VPS HTTP connection failed");
+    }
+    
+    // Initialize WebSocket connection
+    DEBUG_PRINTLN("\n=== Initializing WebSocket ===");
+    vpsWebSocket.begin();
+    
+    // Set up WebSocket callbacks
+    vpsWebSocket.onRelayCommand(onRelayCommandReceived);
+    vpsWebSocket.onSensorRequest(onSensorRequestReceived);
+    
+    // Wait for WebSocket connection
+    DEBUG_PRINTLN("Waiting for WebSocket connection...");
+    int attempts = 0;
+    while (!vpsWebSocket.isConnected() && attempts < 20) {
+        vpsWebSocket.loop();
+        delay(500);
+        DEBUG_PRINT(".");
+        attempts++;
+    }
+    DEBUG_PRINTLN();
+    
+    if (vpsWebSocket.isConnected()) {
+        DEBUG_PRINTLN("✓ WebSocket connected!");
         
         // Send initial log
-        vpsClient.sendLog("info", "ESP32 Greenhouse started - VPS client mode");
+        vpsWebSocket.sendLog("info", "ESP32 Greenhouse started - WebSocket mode");
         
-        // Send initial state of all 4 relays
+        // Send initial state of all 4 relays via WebSocket
         DEBUG_PRINTLN("\n=== Sending Initial Relay States ===");
         for (int i = 0; i < 4; i++) {
             bool state = relays.getRelayState(i);
-            vpsClient.sendRelayState(i, state, "manual", "system");
+            vpsWebSocket.sendRelayState(i, state, "manual", "system");
             DEBUG_PRINTF("Relay %d initial state: %s\n", i, state ? "ON" : "OFF");
             delay(100);  // Small delay between requests
         }
@@ -221,7 +230,7 @@ void setup() {
         delay(2000);  // Wait for sensors to stabilize
         sendSensorData();
     } else {
-        DEBUG_PRINTLN("⚠ VPS connection failed, will retry");
+        DEBUG_PRINTLN("⚠ WebSocket connection failed, will retry in loop");
     }
     
     DEBUG_PRINTLN("\n=== Setup Complete ===");
@@ -229,14 +238,15 @@ void setup() {
 }
 
 void loop() {
+    // WebSocket loop (must be called frequently)
+    vpsWebSocket.loop();
+    
     // Periodic tasks
     checkVPSHealth();
     sendSensorData();
-    pollRelayStates();
-    syncRules();
     
     // Small delay to prevent busy-waiting
-    delay(100);
+    delay(10);
     
     // Yield to WiFi stack
     yield();
