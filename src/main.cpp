@@ -206,9 +206,6 @@ void sendSensorData() {
         return;
     }
     
-    DEBUG_PRINTF("Temperature: %.1f°C\n", temp);
-    DEBUG_PRINTF("Humidity: %.1f%%\n", hum);
-    
     bool success = vpsWebSocket.sendSensorData(temp, hum);
     
     if (!success) {

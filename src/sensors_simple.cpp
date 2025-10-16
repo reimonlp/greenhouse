@@ -69,8 +69,6 @@ bool SensorManager::readSensors() {
         currentData.timestamp = now;
         currentData.valid = true;
         lastValidData = currentData;
-        
-        DEBUG_PRINTF("Sensors: T=%.1f°C H=%.1f%%\n", temp, hum);
     } else {
         DEBUG_PRINTLN("⚠ DHT22 reading failed");
         currentData.valid = false;
@@ -88,6 +86,15 @@ bool SensorManager::readSensors() {
     #endif
     
     lastSoilComplete = true;
+    
+    // Consolidated sensor log with all available data
+    if (lastDhtValid) {
+        if (currentData.soil_moisture_1 > 0) {
+            DEBUG_PRINTF("Sensors: T=%.1f°C H=%.1f%% Soil=%.0f%%\n", temp, hum, currentData.soil_moisture_1);
+        } else {
+            DEBUG_PRINTF("Sensors: T=%.1f°C H=%.1f%%\n", temp, hum);
+        }
+    }
     
     return lastDhtValid;
 }
