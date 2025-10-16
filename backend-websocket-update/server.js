@@ -61,7 +61,8 @@ io.on('connection', (socket) => {
     
     // Validate authentication token
     if (!data.auth_token || data.auth_token !== ESP32_AUTH_TOKEN) {
-      console.log('🚨 [SECURITY] Authentication failed for device:', data.device_id, '| IP:', socket.handshake.address);
+      const realIP = socket.handshake.headers['x-forwarded-for']?.split(',')[0] || socket.handshake.address;
+      console.log('🚨 [SECURITY] Authentication failed for device:', data.device_id, '| IP:', realIP);
       socket.emit('device:auth_failed', { 
         error: 'Invalid authentication token',
         device_id: data.device_id
@@ -71,7 +72,8 @@ io.on('connection', (socket) => {
     }
     
     // Log successful authentication (important event)
-    console.log('✅ [AUTH] Device authenticated:', data.device_id, '| Firmware:', data.firmware_version);
+    const realIP = socket.handshake.headers['x-forwarded-for']?.split(',')[0] || socket.handshake.address;
+    console.log('✅ [AUTH] Device authenticated:', data.device_id, '| Firmware:', data.firmware_version, '| IP:', realIP);
     socket.deviceId = data.device_id;
     socket.deviceType = data.device_type;
     socket.authenticated = true;
@@ -211,12 +213,20 @@ io.on('connection', (socket) => {
 global.io = io;
 
 // ====== Middleware ======
+// Trust proxy - necesario para obtener IP real detrás de nginx
+app.set('trust proxy', true);
+
 app.use(helmet());
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || '*'
 }));
 app.use(express.json());
-app.use(morgan('combined'));
+
+// Custom morgan format to log real IP addresses
+morgan.token('real-ip', (req) => {
+  return req.ip || req.connection.remoteAddress;
+});
+app.use(morgan(':real-ip - :method :url :status :res[content-length] - :response-time ms'));
 
 // ESP32 authentication middleware for API routes
 const authenticateESP32 = (req, res, next) => {
