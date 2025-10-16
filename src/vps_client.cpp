@@ -26,8 +26,10 @@ int VPSClient::makeRequest(const String& endpoint, const String& method, const S
     
     HTTPClient https;
     
-    String url = String(VPS_API_BASE_URL) + endpoint;
-    DEBUG_PRINTF("Request: %s %s\n", method.c_str(), url.c_str());
+    // Use char buffer to avoid String concatenation
+    char url[256];
+    snprintf(url, sizeof(url), "%s%s", VPS_API_BASE_URL, endpoint.c_str());
+    DEBUG_PRINTF("Request: %s %s\n", method.c_str(), url);
     
     if (!https.begin(secureClient, url)) {
         DEBUG_PRINTLN("HTTPS begin failed");
@@ -35,7 +37,11 @@ int VPSClient::makeRequest(const String& endpoint, const String& method, const S
     }
     
     https.addHeader("Content-Type", "application/json");
-    https.addHeader("Authorization", String("Bearer ") + DEVICE_AUTH_TOKEN);
+    
+    // Use char buffer for auth header
+    char authHeader[256];
+    snprintf(authHeader, sizeof(authHeader), "Bearer %s", DEVICE_AUTH_TOKEN);
+    https.addHeader("Authorization", authHeader);
     https.setTimeout(10000);
     
     int httpCode;

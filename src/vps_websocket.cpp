@@ -256,9 +256,12 @@ bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float
     
     data["timestamp"] = millis();
     
-    String payload = "42[\"sensor:data\",";
-    serializeJson(data, payload);
-    payload += "]";
+    // Use static buffer to avoid String object allocation
+    char payload[384];
+    strcpy(payload, "42[\"sensor:data\",");
+    size_t len = strlen(payload);
+    serializeJson(data, payload + len, sizeof(payload) - len);
+    strcat(payload, "]");
     
     _webSocket.sendTXT(payload);
     
@@ -279,9 +282,12 @@ bool VPSWebSocketClient::sendRelayState(int relayId, bool state, const char* mod
     data["changed_by"] = changedBy;
     data["timestamp"] = millis();
     
-    String payload = "42[\"relay:state\",";
-    serializeJson(data, payload);
-    payload += "]";
+    // Use static buffer to avoid String object allocation
+    char payload[384];
+    strcpy(payload, "42[\"relay:state\",");
+    size_t len = strlen(payload);
+    serializeJson(data, payload + len, sizeof(payload) - len);
+    strcat(payload, "]");
     
     _webSocket.sendTXT(payload);
     DEBUG_PRINTF("✓ Relay %d: %s\n", relayId, state ? "ON" : "OFF");
@@ -300,9 +306,12 @@ bool VPSWebSocketClient::sendLog(const char* level, const char* message) {
     data["message"] = message;
     data["timestamp"] = millis();
     
-    String payload = "42[\"log\",";
-    serializeJson(data, payload);
-    payload += "]";
+    // Use static buffer to avoid String object allocation
+    char payload[384];
+    strcpy(payload, "42[\"log\",");
+    size_t len = strlen(payload);
+    serializeJson(data, payload + len, sizeof(payload) - len);
+    strcat(payload, "]");
     
     _webSocket.sendTXT(payload);
     
@@ -324,9 +333,12 @@ bool VPSWebSocketClient::sendMetrics(const ConnectionMetrics& metrics) {
     data["lastConnectionTime"] = metrics.lastConnectionTime;
     data["totalDisconnections"] = metrics.totalDisconnections;
     
-    String payload = "42[\"metrics\",";
-    serializeJson(data, payload);
-    payload += "]";
+    // Use static buffer to avoid String object allocation
+    char payload[512];
+    strcpy(payload, "42[\"metrics\",");
+    size_t len = strlen(payload);
+    serializeJson(data, payload + len, sizeof(payload) - len);
+    strcat(payload, "]");
     
     _webSocket.sendTXT(payload);
     
@@ -339,11 +351,12 @@ void VPSWebSocketClient::sendEvent(const char* event, JsonDocument& data) {
     // Increment sent messages counter
     _metrics.messagesSent++;
     
-    String payload = "42[\"";
-    payload += event;
-    payload += "\",";
-    serializeJson(data, payload);
-    payload += "]";
+    // Use static buffer to avoid String object allocation
+    char payload[512];
+    snprintf(payload, sizeof(payload), "42[\"%s\",", event);
+    size_t len = strlen(payload);
+    serializeJson(data, payload + len, sizeof(payload) - len);
+    strcat(payload, "]");
     
     _webSocket.sendTXT(payload);
 }
