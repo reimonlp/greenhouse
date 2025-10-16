@@ -15,17 +15,69 @@
 #endif
 
 // ========== MACROS DE DEBUG ==========
+// Log levels: 0=NONE, 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG
+#ifndef LOG_LEVEL
+    #define LOG_LEVEL 4  // Default: show all logs (DEBUG)
+#endif
+
 // Deshabilitar completamente Serial output en producción
 #ifdef DISABLE_SERIAL_OUTPUT
     #define DEBUG_SERIAL_BEGIN(x) ((void)0)
+    #define LOG_ERROR(...) ((void)0)
+    #define LOG_WARN(...) ((void)0)
+    #define LOG_INFO(...) ((void)0)
+    #define LOG_DEBUG(...) ((void)0)
+    #define LOG_ERRORF(...) ((void)0)
+    #define LOG_WARNF(...) ((void)0)
+    #define LOG_INFOF(...) ((void)0)
+    #define LOG_DEBUGF(...) ((void)0)
+    // Legacy macros for backward compatibility
     #define DEBUG_PRINT(...) ((void)0)
     #define DEBUG_PRINTLN(...) ((void)0)
     #define DEBUG_PRINTF(...) ((void)0)
 #else
     #define DEBUG_SERIAL_BEGIN(x) Serial.begin(x)
+    
+    // Error level (always shown if LOG_LEVEL >= 1)
+    #if LOG_LEVEL >= 1
+        #define LOG_ERROR(...) Serial.print("❌ ERROR: "); Serial.println(__VA_ARGS__)
+        #define LOG_ERRORF(...) Serial.print("❌ ERROR: "); Serial.printf(__VA_ARGS__)
+    #else
+        #define LOG_ERROR(...) ((void)0)
+        #define LOG_ERRORF(...) ((void)0)
+    #endif
+    
+    // Warn level (shown if LOG_LEVEL >= 2)
+    #if LOG_LEVEL >= 2
+        #define LOG_WARN(...) Serial.print("⚠ WARN: "); Serial.println(__VA_ARGS__)
+        #define LOG_WARNF(...) Serial.print("⚠ WARN: "); Serial.printf(__VA_ARGS__)
+    #else
+        #define LOG_WARN(...) ((void)0)
+        #define LOG_WARNF(...) ((void)0)
+    #endif
+    
+    // Info level (shown if LOG_LEVEL >= 3)
+    #if LOG_LEVEL >= 3
+        #define LOG_INFO(...) Serial.print("ℹ INFO: "); Serial.println(__VA_ARGS__)
+        #define LOG_INFOF(...) Serial.print("ℹ INFO: "); Serial.printf(__VA_ARGS__)
+    #else
+        #define LOG_INFO(...) ((void)0)
+        #define LOG_INFOF(...) ((void)0)
+    #endif
+    
+    // Debug level (shown if LOG_LEVEL >= 4)
+    #if LOG_LEVEL >= 4
+        #define LOG_DEBUG(...) Serial.println(__VA_ARGS__)
+        #define LOG_DEBUGF(...) Serial.printf(__VA_ARGS__)
+    #else
+        #define LOG_DEBUG(...) ((void)0)
+        #define LOG_DEBUGF(...) ((void)0)
+    #endif
+    
+    // Legacy macros - map to DEBUG level for backward compatibility
     #define DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
-    #define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
-    #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+    #define DEBUG_PRINTLN(...) LOG_DEBUG(__VA_ARGS__)
+    #define DEBUG_PRINTF(...) LOG_DEBUGF(__VA_ARGS__)
 #endif
 
 // ========== CONFIGURACIÓN DE HARDWARE ==========
