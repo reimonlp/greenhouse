@@ -111,7 +111,7 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
         StaticJsonDocument<256> deviceInfo;
         deviceInfo["device_id"] = DEVICE_ID;
         deviceInfo["device_type"] = "esp32";
-        deviceInfo["firmware_version"] = "2.1-websocket";
+        deviceInfo["firmware_version"] = FIRMWARE_VERSION;
         deviceInfo["auth_token"] = DEVICE_AUTH_TOKEN;
         sendEvent("device:register", deviceInfo);
         
