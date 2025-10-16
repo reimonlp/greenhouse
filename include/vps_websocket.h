@@ -53,6 +53,7 @@ private:
     bool _connected;
     unsigned long _lastReconnectAttempt;
     unsigned long _lastPing;
+    unsigned long _lastActivity;  // Track last message sent/received for intelligent heartbeat
     
     // Authentication failure tracking
     bool _authFailed;

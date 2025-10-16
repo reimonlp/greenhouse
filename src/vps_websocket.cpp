@@ -7,6 +7,7 @@ VPSWebSocketClient::VPSWebSocketClient() {
     _connected = false;
     _lastReconnectAttempt = 0;
     _lastPing = 0;
+    _lastActivity = 0;
     _authFailed = false;
     _authFailureCount = 0;
     _lastAuthAttempt = 0;
@@ -38,7 +39,8 @@ bool VPSWebSocketClient::begin() {
     #endif
     
     _webSocket.onEvent(webSocketEvent);
-    _webSocket.enableHeartbeat(15000, 3000, 2);
+    // Disable automatic heartbeat - we'll send manual pings based on activity
+    _webSocket.enableHeartbeat(15000, 3000, 0);  // 0 = disable ping, keep pong handling
     _webSocket.setReconnectInterval(5000);
     
     return true;
@@ -63,12 +65,22 @@ void VPSWebSocketClient::loop() {
     
     _webSocket.loop();
     
+    // Intelligent heartbeat: only send ping if no activity in last 30 seconds
     if (_connected && (millis() - _lastPing > 30000)) {
-        _lastPing = millis();
-        StaticJsonDocument<64> doc;
-        doc["type"] = "ping";
-        doc["device_id"] = DEVICE_ID;
-        sendEvent("ping", doc);
+        unsigned long timeSinceActivity = millis() - _lastActivity;
+        
+        // Only send ping if we haven't sent/received any message in 30s
+        if (timeSinceActivity >= 30000) {
+            _lastPing = millis();
+            StaticJsonDocument<64> doc;
+            doc["type"] = "ping";
+            doc["device_id"] = DEVICE_ID;
+            sendEvent("ping", doc);
+            DEBUG_PRINTLN("♡ Heartbeat (no recent activity)");
+        } else {
+            // Activity detected, reset ping timer
+            _lastPing = millis();
+        }
     }
 }
 
@@ -104,7 +116,8 @@ void VPSWebSocketClient::webSocketEvent(WStype_t type, uint8_t * payload, size_t
 void VPSWebSocketClient::handleConnected() {
     _connected = true;
     _metrics.totalConnections++;
-    _metrics.lastConnectionTime = millis();
+    _metrics.lastConnectionTime = millis() / 1000;
+    _lastActivity = millis();  // Reset activity timer on new connection
     if (_metrics.totalConnections > 1) {
         _metrics.reconnections++;
     }
@@ -118,8 +131,9 @@ void VPSWebSocketClient::handleDisconnected() {
 }
 
 void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
-    // Increment received messages counter
+    // Increment received messages counter and update last activity
     _metrics.messagesReceived++;
+    _lastActivity = millis();
     
     if (length == 0) return;
     
@@ -355,8 +369,9 @@ bool VPSWebSocketClient::sendMetrics(const ConnectionMetrics& metrics) {
 void VPSWebSocketClient::sendEvent(const char* event, JsonDocument& data) {
     if (!_connected) return;
     
-    // Increment sent messages counter
+    // Increment sent messages counter and update last activity
     _metrics.messagesSent++;
+    _lastActivity = millis();
     
     // Use static buffer to avoid String object allocation
     char payload[512];
