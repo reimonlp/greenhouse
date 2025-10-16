@@ -45,9 +45,13 @@ bool VPSWebSocketClient::begin() {
 }
 
 void VPSWebSocketClient::loop() {
-    // Si hay fallo de autenticación, aplicar backoff exponencial
+    // Si hay fallo de autenticación, aplicar backoff exponencial con jitter
     if (_authFailed) {
-        unsigned long backoffDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
+        unsigned long baseDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
+        // Add ±10% random jitter to prevent thundering herd
+        int jitter = (random(-10, 11) * baseDelay) / 100;
+        unsigned long backoffDelay = baseDelay + jitter;
+        
         if (millis() - _lastAuthAttempt < backoffDelay) {
             // Aún esperando el backoff
             return;
@@ -183,9 +187,12 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
             _lastAuthAttempt = millis();
             _metrics.authFailures++;  // Track auth failures in metrics
             
-            // Calcular backoff exponencial: 30s, 60s, 120s, 240s, max 5 minutos
-            unsigned long backoffDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
-            DEBUG_PRINTF("⚠ Retry after %lu seconds (attempt %d)\n", backoffDelay / 1000, _authFailureCount);
+            // Calcular backoff exponencial con jitter: 30s, 60s, 120s, 240s, max 5 minutos
+            unsigned long baseDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
+            // Add ±10% random jitter to prevent thundering herd
+            int jitter = (random(-10, 11) * baseDelay) / 100;
+            unsigned long backoffDelay = baseDelay + jitter;
+            DEBUG_PRINTF("⚠ Retry after %.1f seconds (attempt %d)\n", backoffDelay / 1000.0, _authFailureCount);
             
             if (_authFailureCount >= 5) {
                 DEBUG_PRINTLN("⚠ Too many auth failures - check your token configuration!");
