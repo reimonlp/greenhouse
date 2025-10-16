@@ -65,7 +65,7 @@ void VPSClient::setLastError(const String& error) {
 }
 
 bool VPSClient::sendSensorData(float temperature, float humidity, float soilMoisture) {
-    StaticJsonDocument<256> doc;
+    StaticJsonDocument<512> doc;  // Increased from 256 to 512
     doc["device_id"] = DEVICE_ID;
     doc["temperature"] = temperature;
     doc["humidity"] = humidity;
@@ -90,7 +90,7 @@ bool VPSClient::sendSensorData(float temperature, float humidity, float soilMois
 }
 
 bool VPSClient::sendRelayState(int relayId, bool state, const char* mode, const char* changedBy) {
-    StaticJsonDocument<128> doc;
+    StaticJsonDocument<256> doc;  // Increased from 128 to 256
     doc["state"] = state;
     doc["mode"] = mode;
     doc["changed_by"] = changedBy;
@@ -121,7 +121,7 @@ bool VPSClient::getRelayStates(bool states[4]) {
         return false;
     }
     
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<2048> doc;  // Increased to 2048 for relay states array with all MongoDB fields
     DeserializationError error = deserializeJson(doc, response);
     
     if (error) {
@@ -164,7 +164,7 @@ String VPSClient::getRules(int relayId) {
 }
 
 bool VPSClient::createRule(int relayId, const char* sensor, const char* op, float threshold, const char* action) {
-    StaticJsonDocument<256> doc;
+    StaticJsonDocument<512> doc;  // Increased from 256 to 512
     doc["relay_id"] = relayId;
     doc["enabled"] = true;
     
@@ -208,7 +208,7 @@ bool VPSClient::deleteRule(const String& ruleId) {
 }
 
 bool VPSClient::sendLog(const char* level, const char* message, const char* metadata) {
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<1024> doc;  // Increased from 512 to 1024
     doc["level"] = level;
     doc["message"] = message;
     
@@ -232,7 +232,7 @@ bool VPSClient::healthCheck() {
         return false;
     }
     
-    StaticJsonDocument<256> doc;
+    StaticJsonDocument<512> doc;  // Increased from 256 to 512
     DeserializationError error = deserializeJson(doc, response);
     
     if (error) {
@@ -240,14 +240,21 @@ bool VPSClient::healthCheck() {
     }
     
     const char* status = doc["status"];
-    const char* mongodb = doc["mongodb"];
+    const char* database = doc["database"];  // Changed from "mongodb" to "database"
     
-    bool healthy = (strcmp(status, "ok") == 0 && strcmp(mongodb, "connected") == 0);
+    // Safety check for NULL pointers
+    if (!status || !database) {
+        DEBUG_PRINTLN("✗ VPS health check: Invalid response (NULL fields)");
+        DEBUG_PRINTF("  Response: %s\n", response.c_str());
+        return false;
+    }
+    
+    bool healthy = (strcmp(status, "ok") == 0 && strcmp(database, "connected") == 0);
     
     if (healthy) {
         DEBUG_PRINTLN("✓ VPS health check: OK");
     } else {
-        DEBUG_PRINTF("⚠ VPS health check: status=%s, mongodb=%s\n", status, mongodb);
+        DEBUG_PRINTF("⚠ VPS health check: status=%s, database=%s\n", status, database);
     }
     
     return healthy;
