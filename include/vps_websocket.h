@@ -1,0 +1,60 @@
+#ifndef VPS_WEBSOCKET_H
+#define VPS_WEBSOCKET_H
+
+#include <Arduino.h>
+#include <WebSocketsClient.h>
+#include <ArduinoJson.h>
+#include "vps_config.h"
+
+// Callback types
+typedef void (*RelayCommandCallback)(int relayId, bool state);
+typedef void (*SensorRequestCallback)();
+
+class VPSWebSocketClient {
+public:
+    VPSWebSocketClient();
+    
+    // Connection management
+    bool begin();
+    void loop();
+    bool isConnected();
+    
+    // Send data to server
+    bool sendSensorData(float temperature, float humidity, float soilMoisture = -1);
+    bool sendRelayState(int relayId, bool state, const char* mode = "manual", const char* changedBy = "esp32");
+    bool sendLog(const char* level, const char* message);
+    
+    // Set callbacks for incoming commands
+    void onRelayCommand(RelayCommandCallback callback);
+    void onSensorRequest(SensorRequestCallback callback);
+    
+    // Get connection status
+    String getStatus();
+
+private:
+    WebSocketsClient _webSocket;
+    bool _connected;
+    unsigned long _lastReconnectAttempt;
+    unsigned long _lastPing;
+    
+    // Callbacks
+    RelayCommandCallback _relayCommandCallback;
+    SensorRequestCallback _sensorRequestCallback;
+    
+    // WebSocket event handler
+    static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
+    static VPSWebSocketClient* _instance;
+    
+    // Internal handlers
+    void handleConnected();
+    void handleDisconnected();
+    void handleMessage(uint8_t * payload, size_t length);
+    void handleRelayCommand(JsonObject& data);
+    void handleSensorRequest();
+    
+    // Helper methods
+    void sendEvent(const char* event, JsonDocument& data);
+    bool reconnect();
+};
+
+#endif // VPS_WEBSOCKET_H

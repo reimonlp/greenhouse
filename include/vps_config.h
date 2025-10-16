@@ -33,4 +33,9 @@
 // Device identification
 #define DEVICE_ID                   "ESP32_GREENHOUSE_01"
 
+// ========== WEBSOCKET CONFIGURATION ==========
+#define VPS_WEBSOCKET_HOST          "168.181.185.42"
+#define VPS_WEBSOCKET_PORT          3000
+#define VPS_WEBSOCKET_PATH          "/socket.io/?EIO=4&transport=websocket"
+
 #endif // VPS_CONFIG_H
