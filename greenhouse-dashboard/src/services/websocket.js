@@ -18,7 +18,7 @@ class WebSocketService {
     console.log('Conectando a WebSocket:', API_BASE_URL);
     
     this.socket = io(API_BASE_URL, {
-      path: '/socket.io/',
+      path: '/greenhouse/socket.io/',
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
