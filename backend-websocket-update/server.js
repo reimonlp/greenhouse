@@ -16,7 +16,17 @@ const RelayState = require('./models/RelayState');
 const Rule = require('./models/Rule');
 const SystemLog = require('./models/SystemLog');
 
-const { evaluateSensorRules, evaluateTimeRules } = require('./ruleEngine');
+// Rule engine functions (if ruleEngine.js exists)
+let evaluateSensorRules = async () => {};
+let evaluateTimeRules = async () => {};
+try {
+  const ruleEngine = require('./ruleEngine');
+  evaluateSensorRules = ruleEngine.evaluateSensorRules || evaluateSensorRules;
+  evaluateTimeRules = ruleEngine.evaluateTimeRules || evaluateTimeRules;
+} catch (err) {
+  console.log('⚠️ [WARN] ruleEngine.js not found - rule evaluation disabled');
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -35,7 +45,7 @@ const io = new Server(server, {
 
 // Socket.IO connection handler
 io.on('connection', (socket) => {
-  console.log('✓ Cliente WebSocket conectado:', socket.id);
+  // Silent connection - no log noise
   
   // Enviar datos iniciales al conectar
   socket.emit('connected', { 
@@ -47,11 +57,11 @@ io.on('connection', (socket) => {
   
   // Device registration with authentication
   socket.on('device:register', async (data) => {
-    console.log('📱 ESP32 device attempting to register:', data.device_id);
+    // Silent attempt - only log failures and successes
     
     // Validate authentication token
     if (!data.auth_token || data.auth_token !== ESP32_AUTH_TOKEN) {
-      console.log('✗ Authentication failed for device:', data.device_id);
+      console.log('🚨 [SECURITY] Authentication failed for device:', data.device_id, '| IP:', socket.handshake.address);
       socket.emit('device:auth_failed', { 
         error: 'Invalid authentication token',
         device_id: data.device_id
@@ -60,7 +70,8 @@ io.on('connection', (socket) => {
       return;
     }
     
-    console.log('✓ Authentication successful for device:', data.device_id);
+    // Log successful authentication (important event)
+    console.log('✅ [AUTH] Device authenticated:', data.device_id, '| Firmware:', data.firmware_version);
     socket.deviceId = data.device_id;
     socket.deviceType = data.device_type;
     socket.authenticated = true;
@@ -74,10 +85,19 @@ io.on('connection', (socket) => {
       message: 'Authentication successful'
     });
     
+    // Log connection without exposing sensitive data
+    const sanitizedData = {
+      device_id: data.device_id,
+      device_type: data.device_type,
+      firmware_version: data.firmware_version,
+      ip: socket.handshake.address
+      // auth_token deliberately excluded for security
+    };
+    
     await SystemLog.create({
       level: 'info',
       message: `ESP32 device ${data.device_id} connected via WebSocket`,
-      metadata: data
+      metadata: sanitizedData
     });
   });
   
@@ -85,11 +105,11 @@ io.on('connection', (socket) => {
   socket.on('sensor:data', async (data) => {
     // Check authentication
     if (!socket.authenticated) {
-      console.log('⚠ Unauthorized sensor:data attempt from:', socket.id);
+      console.log('🚨 [SECURITY] Unauthorized sensor:data attempt from:', socket.id);
       return;
     }
     
-    console.log('📊 Sensor data from ESP32:', data);
+    // Silent processing - no log spam for normal sensor data
     
     try {
       const sensorReading = await SensorReading.create({
@@ -102,10 +122,10 @@ io.on('connection', (socket) => {
       // Broadcast to all connected clients (dashboard)
       io.emit('sensor:new', sensorReading);
       
-      // Evaluate sensor-based rules
+      // Evaluate sensor-based rules (will log if thresholds exceeded)
       await evaluateSensorRules(sensorReading);
     } catch (error) {
-      console.error('Error saving sensor data:', error);
+      console.error('❌ [ERROR] Failed to save sensor data:', error.message);
     }
   });
   
@@ -113,11 +133,14 @@ io.on('connection', (socket) => {
   socket.on('relay:state', async (data) => {
     // Check authentication
     if (!socket.authenticated) {
-      console.log('⚠ Unauthorized relay:state attempt from:', socket.id);
+      console.log('🚨 [SECURITY] Unauthorized relay:state attempt from:', socket.id);
       return;
     }
     
-    console.log('🔌 Relay state from ESP32:', data);
+    // Log relay changes (important event)
+    const relayNames = ['Luces', 'Ventilador', 'Bomba', 'Calefactor'];
+    const relayName = relayNames[data.relay_id] || `Relay ${data.relay_id}`;
+    console.log(`🔌 [RELAY] ${relayName} → ${data.state ? 'ON' : 'OFF'} | Mode: ${data.mode || 'manual'} | By: ${data.changed_by || 'esp32'}`);
     
     try {
       const relayState = await RelayState.findOneAndUpdate(
@@ -133,14 +156,30 @@ io.on('connection', (socket) => {
       
       // Broadcast to all connected clients (dashboard)
       io.emit('relay:changed', relayState);
+      
+      // Log to SystemLog for audit trail
+      await SystemLog.create({
+        level: 'info',
+        message: `Relay ${data.relay_id} (${relayName}) changed to ${data.state ? 'ON' : 'OFF'}`,
+        metadata: {
+          relay_id: data.relay_id,
+          relay_name: relayName,
+          state: data.state,
+          mode: data.mode || 'manual',
+          changed_by: data.changed_by || 'esp32'
+        }
+      });
     } catch (error) {
-      console.error('Error updating relay state:', error);
+      console.error('❌ [ERROR] Failed to update relay state:', error.message);
     }
   });
   
   // Log from ESP32
   socket.on('log', async (data) => {
-    console.log('📝 Log from ESP32:', data.message);
+    // Only log warnings and errors from ESP32
+    if (data.level === 'warn' || data.level === 'error') {
+      console.log(`⚠️ [ESP32-${data.level.toUpperCase()}]`, data.message);
+    }
     
     try {
       await SystemLog.create({
@@ -149,20 +188,22 @@ io.on('connection', (socket) => {
         metadata: { device_id: data.device_id }
       });
     } catch (error) {
-      console.error('Error saving log:', error);
+      console.error('❌ [ERROR] Failed to save ESP32 log:', error.message);
     }
   });
   
   // Ping/Pong for keepalive
   socket.on('ping', (data) => {
+    // Silent ping/pong - no log spam
     socket.emit('pong', { timestamp: new Date() });
   });
   
   socket.on('disconnect', () => {
-    console.log('✗ Cliente WebSocket desconectado:', socket.id);
+    // Only log ESP32 device disconnections (important)
     if (socket.deviceId) {
-      console.log('  Device:', socket.deviceId);
+      console.log('⚠️ [DISCONNECT] ESP32 device disconnected:', socket.deviceId);
     }
+    // Silent disconnect for dashboard clients
   });
 });
 
