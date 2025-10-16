@@ -138,6 +138,14 @@ app.get('/api/sensors/latest', async (req, res) => {
 });
 
 // ====== Relay Endpoints ======
+// Nombres de los relays según configuración del ESP32
+const RELAY_NAMES = {
+  0: 'luces',
+  1: 'ventilador',
+  2: 'bomba',
+  3: 'calefactor'
+};
+
 app.get('/api/relays/states', async (req, res) => {
   try {
     // Obtener el último estado de cada relay usando aggregation
@@ -153,7 +161,13 @@ app.get('/api/relays/states', async (req, res) => {
       { $sort: { relay_id: 1 } }
     ]);
     
-    res.json({ success: true, data: states });
+    // Agregar nombres a cada relay
+    const statesWithNames = states.map(state => ({
+      ...state,
+      name: RELAY_NAMES[state.relay_id] || `relay_${state.relay_id}`
+    }));
+    
+    res.json({ success: true, data: statesWithNames });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

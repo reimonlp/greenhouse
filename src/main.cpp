@@ -207,6 +207,16 @@ void setup() {
         // Send initial log
         vpsClient.sendLog("info", "ESP32 Greenhouse started - VPS client mode");
         
+        // Send initial state of all 4 relays
+        DEBUG_PRINTLN("\n=== Sending Initial Relay States ===");
+        for (int i = 0; i < 4; i++) {
+            bool state = relays.getRelayState(i);
+            vpsClient.sendRelayState(i, state, "manual", "system");
+            DEBUG_PRINTF("Relay %d initial state: %s\n", i, state ? "ON" : "OFF");
+            delay(100);  // Small delay between requests
+        }
+        DEBUG_PRINTLN("✓ Initial relay states sent");
+        
         // Initial sensor reading
         delay(2000);  // Wait for sensors to stabilize
         sendSensorData();
