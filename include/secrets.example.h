@@ -11,6 +11,9 @@
 // API token (>=24 chars aleatorios recomendados)
 #define API_TOKEN        "token_super_secreto"
 
+// Device authentication for VPS/WebSocket (change in production!)
+#define DEVICE_AUTH_TOKEN "esp32_greenhouse_secure_token_2024_change_this"
+
 // MongoDB Atlas URI (SRV). Ejemplo provisto por el usuario:
 // FORMATO: mongodb+srv://usuario:password@cluster0.zomntcg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
 #define MONGODB_URI      "mongodb+srv://usuario:password@cluster0.zomntcg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"

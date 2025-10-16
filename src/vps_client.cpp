@@ -1,59 +1,70 @@
 #include "vps_client.h"
+#include "vps_config.h"
 #include "config.h"
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+WiFiClientSecure secureClient;
 
 VPSClient::VPSClient() {
     _lastError = "";
+    _isConnected = false;
+    secureClient.setInsecure();
 }
 
-bool VPSClient::makeRequest(const char* method, const char* endpoint, const char* payload, String* response) {
-    String url = buildUrl(endpoint);
-    
-    _http.begin(url);
-    _http.setTimeout(HTTP_TIMEOUT_MS);
-    _http.addHeader("Content-Type", "application/json");
-    
-    int httpCode = -1;
-    int retries = 0;
-    
-    while (retries < HTTP_MAX_RETRIES && httpCode < 0) {
-        if (strcmp(method, "GET") == 0) {
-            httpCode = _http.GET();
-        } else if (strcmp(method, "POST") == 0) {
-            httpCode = _http.POST(payload ? payload : "");
-        } else if (strcmp(method, "PUT") == 0) {
-            httpCode = _http.PUT(payload ? payload : "");
-        } else if (strcmp(method, "DELETE") == 0) {
-            httpCode = _http.sendRequest("DELETE");
-        }
-        
-        if (httpCode < 0) {
-            retries++;
-            if (retries < HTTP_MAX_RETRIES) {
-                DEBUG_PRINTF("HTTP request failed, retry %d/%d\n", retries, HTTP_MAX_RETRIES);
-                delay(HTTP_RETRY_DELAY_MS);
-            }
-        }
+void VPSClient::begin() {
+    DEBUG_PRINTLN("VPSClient initialized for reimon.dev (HTTPS)");
+    _isConnected = true;
+}
+
+int VPSClient::makeRequest(const String& endpoint, const String& method, const String& payload, String& response) {
+    if (!_isConnected) {
+        DEBUG_PRINTLN("VPSClient not connected");
+        return -1;
     }
     
-    bool success = false;
+    HTTPClient https;
+    
+    String url = String(VPS_API_BASE_URL) + endpoint;
+    DEBUG_PRINTF("Request: %s %s\n", method.c_str(), url.c_str());
+    
+    if (!https.begin(secureClient, url)) {
+        DEBUG_PRINTLN("HTTPS begin failed");
+        return -1;
+    }
+    
+    https.addHeader("Content-Type", "application/json");
+    https.addHeader("Authorization", String("Bearer ") + DEVICE_AUTH_TOKEN);
+    https.setTimeout(10000);
+    
+    int httpCode;
+    if (method == "POST") {
+        httpCode = https.POST(payload);
+    } else if (method == "GET") {
+        httpCode = https.GET();
+    } else if (method == "PUT") {
+        httpCode = https.PUT(payload);
+    } else if (method == "DELETE") {
+        httpCode = https.sendRequest("DELETE", payload);
+    } else {
+        httpCode = -1;
+    }
     
     if (httpCode > 0) {
-        if (httpCode == 200 || httpCode == 201) {
-            if (response) {
-                *response = _http.getString();
-            }
-            success = true;
-        } else {
-            setLastError("HTTP " + String(httpCode) + ": " + _http.getString());
-            DEBUG_PRINTF("HTTP error %d: %s\n", httpCode, _http.getString().c_str());
+        response = https.getString();
+        DEBUG_PRINTF("Response code: %d\n", httpCode);
+        
+        if (httpCode == 401 || httpCode == 403) {
+            DEBUG_PRINTLN("✗ Authentication failed - invalid token!");
         }
     } else {
-        setLastError("Connection failed: " + _http.errorToString(httpCode));
-        DEBUG_PRINTF("HTTP connection failed: %s\n", _http.errorToString(httpCode).c_str());
+        DEBUG_PRINTF("Request failed: %s\n", https.errorToString(httpCode).c_str());
     }
     
-    _http.end();
-    return success;
+    https.end();
+    
+    return httpCode;
 }
 
 String VPSClient::buildUrl(const char* endpoint) {
@@ -65,7 +76,7 @@ void VPSClient::setLastError(const String& error) {
 }
 
 bool VPSClient::sendSensorData(float temperature, float humidity, float soilMoisture) {
-    StaticJsonDocument<512> doc;  // Increased from 256 to 512
+    StaticJsonDocument<256> doc;
     doc["device_id"] = DEVICE_ID;
     doc["temperature"] = temperature;
     doc["humidity"] = humidity;
@@ -77,18 +88,17 @@ bool VPSClient::sendSensorData(float temperature, float humidity, float soilMois
     String payload;
     serializeJson(doc, payload);
     
-    DEBUG_PRINTLN("Sending sensor data to VPS...");
-    bool result = makeRequest("POST", VPS_ENDPOINT_SENSORS, payload.c_str(), nullptr);
+    String response;
+    int code = makeRequest("/api/sensors", "POST", payload, response);
     
-    if (result) {
-        DEBUG_PRINTLN("✓ Sensor data sent successfully");
-    } else {
-        DEBUG_PRINTF("✗ Failed to send sensor data: %s\n", _lastError.c_str());
-    }
-    
-    return result;
+    return (code == 200 || code == 201);
 }
 
+// ========================================
+// LEGACY HTTP API - Currently unused (WebSocket preferred)
+// ========================================
+
+/*
 bool VPSClient::sendRelayState(int relayId, bool state, const char* mode, const char* changedBy) {
     StaticJsonDocument<256> doc;  // Increased from 128 to 256
     doc["state"] = state;
@@ -261,9 +271,8 @@ bool VPSClient::healthCheck() {
 }
 
 bool VPSClient::syncRules() {
-    // Placeholder para sincronización completa de reglas
-    // Implementar según necesidad
     DEBUG_PRINTLN("Syncing rules from VPS...");
     String rulesJson = getRules();
     return !rulesJson.isEmpty();
 }
+*/

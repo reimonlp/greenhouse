@@ -1,13 +1,15 @@
 #include "vps_websocket.h"
 #include "config.h"
 
-// Static instance pointer for callback
 VPSWebSocketClient* VPSWebSocketClient::_instance = nullptr;
 
 VPSWebSocketClient::VPSWebSocketClient() {
     _connected = false;
     _lastReconnectAttempt = 0;
     _lastPing = 0;
+    _authFailed = false;
+    _authFailureCount = 0;
+    _lastAuthAttempt = 0;
     _relayCommandCallback = nullptr;
     _sensorRequestCallback = nullptr;
     _instance = this;
@@ -16,27 +18,36 @@ VPSWebSocketClient::VPSWebSocketClient() {
 bool VPSWebSocketClient::begin() {
     DEBUG_PRINTLN("Initializing WebSocket connection...");
     
-    // Parse VPS_WEBSOCKET_HOST and VPS_WEBSOCKET_PORT from vps_config.h
+    #ifdef VPS_WEBSOCKET_USE_SSL
+    _webSocket.beginSSL(VPS_WEBSOCKET_HOST, VPS_WEBSOCKET_PORT, VPS_WEBSOCKET_PATH);
+    DEBUG_PRINTF("WebSocket SSL configured: wss://%s:%d%s\n", VPS_WEBSOCKET_HOST, VPS_WEBSOCKET_PORT, VPS_WEBSOCKET_PATH);
+    #else
     _webSocket.begin(VPS_WEBSOCKET_HOST, VPS_WEBSOCKET_PORT, VPS_WEBSOCKET_PATH);
+    DEBUG_PRINTF("WebSocket configured: ws://%s:%d%s\n", VPS_WEBSOCKET_HOST, VPS_WEBSOCKET_PORT, VPS_WEBSOCKET_PATH);
+    #endif
     
-    // Set event handler
     _webSocket.onEvent(webSocketEvent);
-    
-    // Enable heartbeat
     _webSocket.enableHeartbeat(15000, 3000, 2);
-    
-    // Set reconnect interval
     _webSocket.setReconnectInterval(5000);
-    
-    DEBUG_PRINTF("WebSocket configured: %s:%d%s\n", VPS_WEBSOCKET_HOST, VPS_WEBSOCKET_PORT, VPS_WEBSOCKET_PATH);
     
     return true;
 }
 
 void VPSWebSocketClient::loop() {
+    // Si hay fallo de autenticación, aplicar backoff exponencial
+    if (_authFailed) {
+        unsigned long backoffDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
+        if (millis() - _lastAuthAttempt < backoffDelay) {
+            // Aún esperando el backoff
+            return;
+        }
+        // Reset y permitir reconexión
+        _authFailed = false;
+        DEBUG_PRINTLN("Retrying authentication...");
+    }
+    
     _webSocket.loop();
     
-    // Send periodic ping if connected
     if (_connected && (millis() - _lastPing > 30000)) {
         _lastPing = millis();
         StaticJsonDocument<64> doc;
@@ -78,15 +89,6 @@ void VPSWebSocketClient::webSocketEvent(WStype_t type, uint8_t * payload, size_t
 void VPSWebSocketClient::handleConnected() {
     _connected = true;
     DEBUG_PRINTLN("✓ WebSocket connected to VPS!");
-    
-    // Send device registration
-    StaticJsonDocument<128> doc;
-    doc["type"] = "device_register";
-    doc["device_id"] = DEVICE_ID;
-    doc["device_type"] = "esp32";
-    doc["firmware_version"] = "2.1-websocket";
-    
-    sendEvent("device:register", doc);
 }
 
 void VPSWebSocketClient::handleDisconnected() {
@@ -95,51 +97,116 @@ void VPSWebSocketClient::handleDisconnected() {
 }
 
 void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
-    DEBUG_PRINTF("WebSocket message: %s\n", payload);
+    if (length < 1) return;
     
-    StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, payload, length);
+    char packetType = payload[0];
     
-    if (error) {
-        DEBUG_PRINTF("JSON parse error: %s\n", error.c_str());
-        return;
-    }
-    
-    // Check message type
-    const char* eventType = doc["event"];
-    if (!eventType) {
-        DEBUG_PRINTLN("Message missing 'event' field");
-        return;
-    }
-    
-    // Handle different event types
-    if (strcmp(eventType, "relay:command") == 0) {
-        JsonObject data = doc["data"];
-        if (!data.isNull()) {
-            handleRelayCommand(data);
+    if (packetType == '0') {
+        DEBUG_PRINTLN("✓ Connected to server");
+        _webSocket.sendTXT("40");
+        
+        delay(100);
+        
+        unsigned long regStart = millis();
+        StaticJsonDocument<256> deviceInfo;
+        deviceInfo["device_id"] = DEVICE_ID;
+        deviceInfo["device_type"] = "esp32";
+        deviceInfo["firmware_version"] = "2.1-websocket";
+        deviceInfo["auth_token"] = DEVICE_AUTH_TOKEN;
+        sendEvent("device:register", deviceInfo);
+        
+        while (millis() - regStart < 3000) {
+            delay(10);
         }
-    } else if (strcmp(eventType, "sensor:request") == 0) {
-        handleSensorRequest();
-    } else if (strcmp(eventType, "ping") == 0) {
-        // Respond to ping
-        StaticJsonDocument<64> response;
-        response["type"] = "pong";
-        sendEvent("pong", response);
+        
+        DEBUG_PRINTLN("✓ Device registered");
+        
+        return;
+    }
+    
+    if (packetType == '2') {
+        _webSocket.sendTXT("3");
+        return;
+    }
+    
+    if (length >= 2 && payload[0] == '4' && payload[1] == '2') {
+        const char* jsonStart = (const char*)(payload + 2);
+        
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, jsonStart);
+        
+        if (error) {
+            DEBUG_PRINTF("JSON parse error: %s\n", error.c_str());
+            return;
+        }
+        
+        if (!doc.is<JsonArray>() || doc.size() < 1) {
+            DEBUG_PRINTLN("Invalid Socket.IO event format");
+            return;
+        }
+        
+        const char* eventName = doc[0];
+        if (!eventName) return;
+        
+        DEBUG_PRINTF("Event received: %s\n", eventName);
+        
+        if (strcmp(eventName, "device:auth_success") == 0) {
+            DEBUG_PRINTLN("✓ Authentication successful");
+            _authFailed = false;
+            _authFailureCount = 0;
+            return;
+        } else if (strcmp(eventName, "device:auth_failed") == 0) {
+            DEBUG_PRINTLN("✗ Authentication FAILED - invalid token!");
+            _connected = false;
+            _authFailed = true;
+            _authFailureCount++;
+            _lastAuthAttempt = millis();
+            
+            // Calcular backoff exponencial: 30s, 60s, 120s, 240s, max 5 minutos
+            unsigned long backoffDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
+            DEBUG_PRINTF("⚠ Retry after %lu seconds (attempt %d)\n", backoffDelay / 1000, _authFailureCount);
+            
+            if (_authFailureCount >= 5) {
+                DEBUG_PRINTLN("⚠ Too many auth failures - check your token configuration!");
+            }
+            
+            return;
+        } else if (strcmp(eventName, "relay:command") == 0 && doc.size() >= 2) {
+            JsonObject data = doc[1];
+            if (!data.isNull()) {
+                handleRelayCommand(data);
+            }
+        } else if (strcmp(eventName, "sensor:request") == 0) {
+            handleSensorRequest();
+        } else if (strcmp(eventName, "ping") == 0) {
+            StaticJsonDocument<64> response;
+            response["type"] = "pong";
+            sendEvent("pong", response);
+        }
     }
 }
 
 void VPSWebSocketClient::handleRelayCommand(JsonObject& data) {
-    int relayId = data["relay_id"] | -1;
-    bool state = data["state"] | false;
+    if (!data.containsKey("relay_id") || !data.containsKey("state")) {
+        DEBUG_PRINTLN("⚠ Missing relay_id or state in command");
+        return;
+    }
     
-    if (relayId >= 0 && relayId < 4) {
-        DEBUG_PRINTF("Relay command received: Relay %d -> %s\n", relayId, state ? "ON" : "OFF");
+    int relayId = data["relay_id"];
+    bool state = data["state"];
+    
+    if (relayId < 0 || relayId >= 4) {
+        DEBUG_PRINTF("⚠ Invalid relay_id: %d (valid: 0-3)\n", relayId);
         
-        if (_relayCommandCallback) {
-            _relayCommandCallback(relayId, state);
-        }
-    } else {
-        DEBUG_PRINTF("Invalid relay_id: %d\n", relayId);
+        StaticJsonDocument<128> error;
+        error["error"] = "invalid_relay_id";
+        error["relay_id"] = relayId;
+        sendEvent("relay:error", error);
+        return;
+    }
+    
+    if (_relayCommandCallback) {
+        _relayCommandCallback(relayId, state);
     }
 }
 
@@ -157,10 +224,7 @@ bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float
         return false;
     }
     
-    StaticJsonDocument<256> doc;
-    doc["event"] = "sensor:data";
-    
-    JsonObject data = doc.createNestedObject("data");
+    StaticJsonDocument<256> data;
     data["device_id"] = DEVICE_ID;
     data["temperature"] = temperature;
     data["humidity"] = humidity;
@@ -171,11 +235,11 @@ bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float
     
     data["timestamp"] = millis();
     
-    String payload;
-    serializeJson(doc, payload);
+    String payload = "42[\"sensor:data\",";
+    serializeJson(data, payload);
+    payload += "]";
     
     _webSocket.sendTXT(payload);
-    DEBUG_PRINTLN("✓ Sensor data sent via WebSocket");
     
     return true;
 }
@@ -186,10 +250,7 @@ bool VPSWebSocketClient::sendRelayState(int relayId, bool state, const char* mod
         return false;
     }
     
-    StaticJsonDocument<256> doc;
-    doc["event"] = "relay:state";
-    
-    JsonObject data = doc.createNestedObject("data");
+    StaticJsonDocument<256> data;
     data["device_id"] = DEVICE_ID;
     data["relay_id"] = relayId;
     data["state"] = state;
@@ -197,11 +258,12 @@ bool VPSWebSocketClient::sendRelayState(int relayId, bool state, const char* mod
     data["changed_by"] = changedBy;
     data["timestamp"] = millis();
     
-    String payload;
-    serializeJson(doc, payload);
+    String payload = "42[\"relay:state\",";
+    serializeJson(data, payload);
+    payload += "]";
     
     _webSocket.sendTXT(payload);
-    DEBUG_PRINTF("✓ Relay %d state sent via WebSocket: %s\n", relayId, state ? "ON" : "OFF");
+    DEBUG_PRINTF("✓ Relay %d: %s\n", relayId, state ? "ON" : "OFF");
     
     return true;
 }
@@ -211,17 +273,15 @@ bool VPSWebSocketClient::sendLog(const char* level, const char* message) {
         return false;
     }
     
-    StaticJsonDocument<256> doc;
-    doc["event"] = "log";
-    
-    JsonObject data = doc.createNestedObject("data");
+    StaticJsonDocument<256> data;
     data["device_id"] = DEVICE_ID;
     data["level"] = level;
     data["message"] = message;
     data["timestamp"] = millis();
     
-    String payload;
-    serializeJson(doc, payload);
+    String payload = "42[\"log\",";
+    serializeJson(data, payload);
+    payload += "]";
     
     _webSocket.sendTXT(payload);
     
@@ -231,12 +291,11 @@ bool VPSWebSocketClient::sendLog(const char* level, const char* message) {
 void VPSWebSocketClient::sendEvent(const char* event, JsonDocument& data) {
     if (!_connected) return;
     
-    StaticJsonDocument<512> doc;
-    doc["event"] = event;
-    doc["data"] = data;
-    
-    String payload;
-    serializeJson(doc, payload);
+    String payload = "42[\"";
+    payload += event;
+    payload += "\",";
+    serializeJson(data, payload);
+    payload += "]";
     
     _webSocket.sendTXT(payload);
 }

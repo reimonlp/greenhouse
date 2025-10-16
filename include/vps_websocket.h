@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
+#include "secrets.h"      // MUST be included BEFORE vps_config.h for DEVICE_AUTH_TOKEN
 #include "vps_config.h"
 
 // Callback types
@@ -36,6 +37,11 @@ private:
     bool _connected;
     unsigned long _lastReconnectAttempt;
     unsigned long _lastPing;
+    
+    // Authentication failure tracking
+    bool _authFailed;
+    int _authFailureCount;
+    unsigned long _lastAuthAttempt;
     
     // Callbacks
     RelayCommandCallback _relayCommandCallback;

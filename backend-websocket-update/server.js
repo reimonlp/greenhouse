@@ -8,6 +8,9 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 
+// ESP32 authentication token (use env variable in production)
+const ESP32_AUTH_TOKEN = process.env.ESP32_AUTH_TOKEN || 'esp32_gh_prod_tk_9f8e7d6c5b4a3210fedcba9876543210abcdef1234567890';
+
 const SensorReading = require('./models/SensorReading');
 const RelayState = require('./models/RelayState');
 const Rule = require('./models/Rule');
@@ -42,14 +45,34 @@ io.on('connection', (socket) => {
   
   // ====== ESP32 Device Events ======
   
-  // Device registration
+  // Device registration with authentication
   socket.on('device:register', async (data) => {
-    console.log('📱 ESP32 device registered:', data);
+    console.log('📱 ESP32 device attempting to register:', data.device_id);
+    
+    // Validate authentication token
+    if (!data.auth_token || data.auth_token !== ESP32_AUTH_TOKEN) {
+      console.log('✗ Authentication failed for device:', data.device_id);
+      socket.emit('device:auth_failed', { 
+        error: 'Invalid authentication token',
+        device_id: data.device_id
+      });
+      socket.disconnect(true);
+      return;
+    }
+    
+    console.log('✓ Authentication successful for device:', data.device_id);
     socket.deviceId = data.device_id;
     socket.deviceType = data.device_type;
+    socket.authenticated = true;
     
     // Join device room for targeted messages
     socket.join('esp32_devices');
+    
+    // Send success confirmation
+    socket.emit('device:auth_success', {
+      device_id: data.device_id,
+      message: 'Authentication successful'
+    });
     
     await SystemLog.create({
       level: 'info',
@@ -60,6 +83,12 @@ io.on('connection', (socket) => {
   
   // Sensor data from ESP32
   socket.on('sensor:data', async (data) => {
+    // Check authentication
+    if (!socket.authenticated) {
+      console.log('⚠ Unauthorized sensor:data attempt from:', socket.id);
+      return;
+    }
+    
     console.log('📊 Sensor data from ESP32:', data);
     
     try {
@@ -82,6 +111,12 @@ io.on('connection', (socket) => {
   
   // Relay state update from ESP32
   socket.on('relay:state', async (data) => {
+    // Check authentication
+    if (!socket.authenticated) {
+      console.log('⚠ Unauthorized relay:state attempt from:', socket.id);
+      return;
+    }
+    
     console.log('🔌 Relay state from ESP32:', data);
     
     try {
@@ -142,6 +177,30 @@ app.use(cors({
 app.use(express.json());
 app.use(morgan('combined'));
 
+// ESP32 authentication middleware for API routes
+const authenticateESP32 = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ 
+      success: false, 
+      error: 'Missing or invalid Authorization header' 
+    });
+  }
+  
+  const token = authHeader.substring(7); // Remove "Bearer " prefix
+  
+  if (token !== ESP32_AUTH_TOKEN) {
+    return res.status(403).json({ 
+      success: false, 
+      error: 'Invalid authentication token' 
+    });
+  }
+  
+  // Token is valid
+  next();
+};
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
@@ -185,7 +244,7 @@ app.get('/health', async (req, res) => {
 });
 
 // ====== Sensor Endpoints ======
-app.post('/api/sensors', async (req, res) => {
+app.post('/api/sensors', authenticateESP32, async (req, res) => {
   try {
     const reading = new SensorReading(req.body);
     await reading.save();

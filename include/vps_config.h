@@ -6,9 +6,9 @@
 #define VPS_CONFIG_H
 
 // ========== VPS API CONFIGURATION ==========
-#define VPS_API_HOST        "168.181.185.42"
-#define VPS_API_PORT        80
-#define VPS_API_BASE_URL    "http://168.181.185.42"
+#define VPS_API_HOST        "reimon.dev"
+#define VPS_API_PORT        443
+#define VPS_API_BASE_URL    "https://reimon.dev/greenhouse"
 
 // API Endpoints
 #define VPS_ENDPOINT_SENSORS        "/api/sensors"
@@ -33,9 +33,16 @@
 // Device identification
 #define DEVICE_ID                   "ESP32_GREENHOUSE_01"
 
+// Security - Authentication token
+// MUST be defined in secrets.h - no default provided for security
+#ifndef DEVICE_AUTH_TOKEN
+#error "DEVICE_AUTH_TOKEN must be defined in secrets.h"
+#endif
+
 // ========== WEBSOCKET CONFIGURATION ==========
-#define VPS_WEBSOCKET_HOST          "168.181.185.42"
-#define VPS_WEBSOCKET_PORT          3000
-#define VPS_WEBSOCKET_PATH          "/socket.io/?EIO=4&transport=websocket"
+#define VPS_WEBSOCKET_HOST          "reimon.dev"
+#define VPS_WEBSOCKET_PORT          443
+#define VPS_WEBSOCKET_PATH          "/greenhouse/socket.io/?EIO=4&transport=websocket"
+#define VPS_WEBSOCKET_USE_SSL       true
 
 #endif // VPS_CONFIG_H

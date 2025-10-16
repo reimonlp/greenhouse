@@ -33,17 +33,10 @@
 #include "pins.h"
 
 // ========== CONFIGURACIÓN DE SISTEMA ==========
-// WiFi conexión fija (se elimina WiFiManager). Credenciales objetivo.
 #define WIFI_SSID           "FDC"
 #define WIFI_PASSWORD       "unacagada"
 #define WIFI_CONNECT_TIMEOUT_MS 15000
 #define WIFI_RETRY_BASE_MS      5000
-// Optional initial delay before first WiFi.begin (define via build_flags if needed)
-// #define WIFI_INITIAL_DELAY_MS 0
-
-// Valores legacy (portal cautivo) eliminados:
-// #define AP_SSID             "ESP32-Invernadero"
-// #define AP_PASSWORD         "invernadero123"
 
 // API y seguridad
 #define API_PORT            80
@@ -54,57 +47,8 @@
 
 // NTP y tiempo
 #define NTP_SERVER          "pool.ntp.org"
-#define GMT_OFFSET_SEC      -10800  // GMT-3 (Argentina)
+#define GMT_OFFSET_SEC      -10800
 #define DAYLIGHT_OFFSET_SEC 0
-
-// MongoDB y logging
-#ifndef MONGODB_URI
-#define MONGODB_URI         "mongodb+srv://usuario:password@cluster.mongodb.net/invernadero"
-#endif
-
-// Opcionales para Data API (definir en secrets.h)
-#ifndef MONGODB_DATA_API_KEY
-#define MONGODB_DATA_API_KEY ""  // define en secrets.h
-#endif
-#ifndef MONGODB_APP_ID
-#define MONGODB_APP_ID ""  // p.ej. "data-xxxxx"
-#endif
-#ifndef MONGODB_DATA_SOURCE
-#define MONGODB_DATA_SOURCE "Cluster0"
-#endif
-#ifndef MONGODB_DATA_API_BASE
-// Si usás servidor local, definirlo en secrets.h como MONGODB_DATA_API_BASE_LOCAL
-#ifdef MONGODB_DATA_API_BASE_LOCAL
-#define MONGODB_DATA_API_BASE MONGODB_DATA_API_BASE_LOCAL
-#else
-#define MONGODB_DATA_API_BASE "https://data.mongodb-api.com" // fallback Atlas (si se usa)
-#endif
-#endif
-#ifndef MONGODB_DB_NAME
-#define MONGODB_DB_NAME "invernadero"
-#endif
-#ifndef MONGODB_COLL_SENSORS
-#define MONGODB_COLL_SENSORS "sensor_data"
-#endif
-#ifndef MONGODB_COLL_LOGS
-#define MONGODB_COLL_LOGS "system_logs"
-#endif
-#ifndef MONGODB_COLL_STATS
-#define MONGODB_COLL_STATS "statistics"
-#endif
-
-#define LOG_BUFFER_SIZE     50    // Logs en buffer antes de enviar
-#define LOG_INTERVAL_MS     30000 // Envío cada 30 segundos
-// Parámetros de batching/jitter para logs (L3)
-#ifndef LOG_MIN_BATCH
-#define LOG_MIN_BATCH 5        // Enviar sólo si al menos N logs acumulados (salvo ERROR/CRITICAL)
-#endif
-#ifndef LOG_MAX_INTERVAL_MS
-#define LOG_MAX_INTERVAL_MS 45000 // Forzar flush si pasa este tiempo sin enviar
-#endif
-#ifndef LOG_FLUSH_JITTER_PCT
-#define LOG_FLUSH_JITTER_PCT 15 // +/- % de jitter aplicado a LOG_INTERVAL_MS
-#endif
 
 // ========== LÍMITES DE SEGURIDAD ==========
 #define MAX_TEMP_CELSIUS        35.0f
@@ -115,45 +59,42 @@
 #define MAX_HEATING_TIME_MS     1800000 // 30 minutos máximo
 
 // ========== CONFIGURACIÓN DE SENSORES ==========
-#define DHT_TYPE                DHT11   // Sensor DHT11 (solo soporte para DHT11)
-#define SENSOR_READ_INTERVAL_MS 5000    // Leer sensores cada 5 segundos
-#define SOIL_MOISTURE_SAMPLES   10      // Promedio de lecturas
+#define DHT_TYPE                DHT11
+#define SENSOR_READ_INTERVAL_MS 5000
+#define SOIL_MOISTURE_SAMPLES   10
 #ifndef SOIL_SAMPLE_INTERVAL_MS
-#define SOIL_SAMPLE_INTERVAL_MS 10      // Intervalo entre muestras no bloqueantes de suelo
+#define SOIL_SAMPLE_INTERVAL_MS 10
 #endif
 
 // ========== CONFIGURACIÓN DE MÉTRICAS ==========
 #ifndef LOOP_EMA_ALPHA
 #define LOOP_EMA_ALPHA 0.05f
 #endif
-#define TEMP_SENSOR_PRECISION   12      // Bits de precisión para DS18B20
-// Estabilización adaptativa DHT (S3)
+#define TEMP_SENSOR_PRECISION   12
 #ifndef DHT_STABILIZE_MS
 #define DHT_STABILIZE_MS 2000
 #endif
 #ifndef DHT_STABILIZE_MIN_MS
-#define DHT_STABILIZE_MIN_MS 600  // mínimo tras calentamiento inicial
+#define DHT_STABILIZE_MIN_MS 600
 #endif
 #ifndef DHT_STABILIZE_DECAY_FACTOR
-#define DHT_STABILIZE_DECAY_FACTOR 0.5f  // reduce a la mitad tras lectura exitosa
+#define DHT_STABILIZE_DECAY_FACTOR 0.5f
 #endif
 
 // Calibración de sensores de humedad de suelo
-#define SOIL_MOISTURE_DRY_VALUE    3000  // Valor ADC para suelo seco
-#define SOIL_MOISTURE_WET_VALUE    1000  // Valor ADC para suelo húmedo
+#define SOIL_MOISTURE_DRY_VALUE    3000
+#define SOIL_MOISTURE_WET_VALUE    1000
 
 // ========== CONFIGURACIÓN DE WATCHDOG ==========
-#define WATCHDOG_TIMEOUT_SEC    120  // 2 minutos para operaciones lentas (WiFi, sensores)
+#define WATCHDOG_TIMEOUT_SEC    120
 
 // ========== CONFIGURACIÓN OTA ==========
-#define OTA_PASSWORD            "ota_password_123"  // Cambiar en producción
+#define OTA_PASSWORD            "ota_password_123"
 #define OTA_PORT                3232
 
 // ========== CONFIGURACIÓN DE ALERTAS ==========
-// Buzzer eliminado completamente
 #define LED_BLINK_FAST_MS       250
 #define LED_BLINK_SLOW_MS       1000
-// Definir STATUS_LED_ACTIVE_LOW vía build_flags si el LED requiere LOW para encender.
 #ifdef STATUS_LED_ACTIVE_LOW
 #define LED_WRITE_ON(pin)  digitalWrite((pin), LOW)
 #define LED_WRITE_OFF(pin) digitalWrite((pin), HIGH)
@@ -190,7 +131,6 @@ struct SensorData {
     float humidity;
     float soil_moisture_1;
     float soil_moisture_2;
-    // External temp sensors removed
     unsigned long timestamp;
     bool valid;
 };
