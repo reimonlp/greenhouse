@@ -3,12 +3,16 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <time.h>
+#include <esp_task_wdt.h>
 #include "config.h"
 #include "vps_config.h"
 #include "vps_client.h"
 #include "vps_websocket.h"
 #include "sensors.h"
 #include "relays.h"
+
+// Watchdog configuration
+#define WDT_TIMEOUT 30  // 30 seconds watchdog timeout
 
 extern SensorManager sensors;
 extern RelayManager relays;
@@ -51,6 +55,9 @@ void setupWiFi() {
         delay(500);
         DEBUG_PRINT(".");
         attempts++;
+        if (attempts % 5 == 0) {
+            esp_task_wdt_reset(); // Feed watchdog every 2.5 seconds during WiFi connection
+        }
     }
     
     if (WiFi.status() == WL_CONNECTED) {
@@ -154,7 +161,13 @@ void setup() {
     DEBUG_PRINTLN("╚══════════════════════════════════════════════╝");
     DEBUG_PRINTLN();
     
-    DEBUG_PRINTLN("=== Initializing Hardware ===");
+    // Configure and enable watchdog timer
+    DEBUG_PRINTLN("=== Initializing Watchdog Timer ===");
+    esp_task_wdt_init(WDT_TIMEOUT, true); // 30s timeout, panic on timeout
+    esp_task_wdt_add(NULL); // Add current task to WDT watch
+    DEBUG_PRINTF("✓ Watchdog enabled (%d seconds)\n", WDT_TIMEOUT);
+    
+    DEBUG_PRINTLN("\n=== Initializing Hardware ===");
     relays.begin();
     sensors.begin();
     DEBUG_PRINTLN("✓ Hardware initialized");
@@ -174,6 +187,7 @@ void setup() {
         vpsWebSocket.loop();
         delay(500);
         DEBUG_PRINT(".");
+        esp_task_wdt_reset(); // Feed watchdog during initialization
         attempts++;
     }
     DEBUG_PRINTLN();
@@ -203,6 +217,9 @@ void setup() {
 }
 
 void loop() {
+    // Feed the watchdog timer at the start of each loop iteration
+    esp_task_wdt_reset();
+    
     vpsWebSocket.loop();
     checkVPSHealth();
     sendSensorData();
