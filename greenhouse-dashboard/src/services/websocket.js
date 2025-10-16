@@ -15,9 +15,14 @@ class WebSocketService {
       return;
     }
 
-    console.log('Conectando a WebSocket:', API_BASE_URL);
+    // Socket.IO debe conectarse al servidor con el path correcto
+    // API_BASE_URL es https://reimon.dev/greenhouse
+    // Necesitamos conectar a https://reimon.dev con path /greenhouse/socket.io/
+    const serverUrl = API_BASE_URL.replace('/greenhouse', '');
     
-    this.socket = io(API_BASE_URL, {
+    console.log('Conectando a WebSocket:', serverUrl, 'con path: /greenhouse/socket.io/');
+    
+    this.socket = io(serverUrl, {
       path: '/greenhouse/socket.io/',
       transports: ['websocket', 'polling'],
       reconnection: true,

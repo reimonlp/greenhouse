@@ -18,7 +18,7 @@ import RuleManager from './RuleManager';
 import SensorChart from './SensorChart';
 import LogViewer from './LogViewer';
 import { getLatestSensorReading, getRelayStates } from '../services/api';
-import { useWebSocket, useSensorUpdates, useRelayUpdates } from '../hooks/useWebSocket';
+import { useWebSocket, useSensorUpdates } from '../hooks/useWebSocket';
 
 function Dashboard() {
   const [sensorData, setSensorData] = useState(null);
@@ -29,20 +29,34 @@ function Dashboard() {
   // WebSocket hooks
   const { isConnected } = useWebSocket();
   const latestSensor = useSensorUpdates();
-  const wsRelayStates = useRelayUpdates();
 
-  // Actualizar datos cuando llegan por WebSocket
+  // Actualizar sensores cuando llegan por WebSocket
   useEffect(() => {
     if (latestSensor) {
       setSensorData(latestSensor);
     }
   }, [latestSensor]);
 
+  // Escuchar cambios de relay por WebSocket
   useEffect(() => {
-    if (wsRelayStates.length > 0) {
-      setRelayStates(wsRelayStates);
-    }
-  }, [wsRelayStates]);
+    const handleRelayChange = (data) => {
+      setRelayStates(prev => {
+        const index = prev.findIndex(r => r.relay_id === data.relay_id);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = data;
+          return updated;
+        }
+        return prev; // No agregar si no existe
+      });
+    };
+
+    // Importar el servicio y suscribirse
+    import('../services/websocket').then(({ default: ws }) => {
+      const unsubscribe = ws.on('relay:changed', handleRelayChange);
+      return unsubscribe;
+    });
+  }, []);
 
   // Cargar datos iniciales
   const fetchData = async () => {

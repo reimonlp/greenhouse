@@ -140,7 +140,19 @@ app.get('/api/sensors/latest', async (req, res) => {
 // ====== Relay Endpoints ======
 app.get('/api/relays/states', async (req, res) => {
   try {
-    const states = await RelayState.find().sort({ relay_id: 1 });
+    // Obtener el último estado de cada relay usando aggregation
+    const states = await RelayState.aggregate([
+      { $sort: { relay_id: 1, timestamp: -1 } },
+      {
+        $group: {
+          _id: '$relay_id',
+          latestState: { $first: '$$ROOT' }
+        }
+      },
+      { $replaceRoot: { newRoot: '$latestState' } },
+      { $sort: { relay_id: 1 } }
+    ]);
+    
     res.json({ success: true, data: states });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
