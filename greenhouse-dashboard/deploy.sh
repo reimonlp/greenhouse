@@ -8,7 +8,7 @@ set -e
 echo "🚀 Iniciando deployment del Greenhouse Dashboard..."
 
 # Variables
-VPS_HOST="168.181.185.42"
+VPS_HOST="reimon.dev"
 VPS_PORT="5591"
 VPS_USER="root"
 FRONTEND_DIR="/opt/greenhouse-frontend"

@@ -31,7 +31,7 @@ if [ -f "/tmp/server.js" ]; then
     echo "   ✓ server.js actualizado"
 else
     echo "   ⚠️  Archivo /tmp/server.js no encontrado"
-    echo "   Súbelo primero con: scp -P 5591 server.js root@168.181.185.42:/tmp/"
+    echo "   Súbelo primero con: scp -P 5591 server.js root@reimon.dev:/tmp/"
     exit 1
 fi
 echo ""

@@ -18,7 +18,7 @@ Conecta al VPS y ejecuta el script de configuración:
 
 ```bash
 # Conectar al VPS
-ssh root@168.181.185.42
+ssh root@reimon.dev
 
 # Copiar archivos de configuración
 cd /tmp
@@ -127,7 +127,7 @@ cd greenhouse-dashboard
 npm run build
 
 # Deploy manual
-rsync -avz dist/ root@168.181.185.42:/var/www/greenhouse/
+rsync -avz dist/ root@reimon.dev:/var/www/greenhouse/
 
 # Deploy con script
 ./deploy-domain.sh

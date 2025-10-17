@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para configurar el VPS después de deployment
-# Ejecutar DESDE el VPS (ssh -p 5591 root@168.181.185.42)
+# Ejecutar DESDE el VPS (ssh -p 5591 root@reimon.dev)
 
 set -e
 
@@ -23,7 +23,7 @@ nginx -t
 cat > /etc/nginx/sites-available/greenhouse << 'EOF'
 server {
     listen 80;
-    server_name 168.181.185.42;
+    server_name reimon.dev;
 
     # Frontend React
     location / {
@@ -80,6 +80,6 @@ pm2 status
 echo ""
 systemctl status nginx --no-pager -l
 echo ""
-echo "🌐 Dashboard disponible en: http://168.181.185.42"
-echo "🔌 API disponible en: http://168.181.185.42/api"
-echo "💚 Health check: http://168.181.185.42/health"
+echo "🌐 Dashboard disponible en: http://reimon.dev"
+echo "🔌 API disponible en: http://reimon.dev/api"
+echo "💚 Health check: http://reimon.dev/health"

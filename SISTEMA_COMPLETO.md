@@ -11,7 +11,7 @@
 
 ┌──────────────┐          ┌──────────────────────┐          ┌─────────────┐
 │   ESP32      │  WiFi    │    VPS Ubuntu 24     │  HTTP    │  Browser    │
-│  (Cliente)   │ ◄──────► │  168.181.185.42      │ ◄──────► │  Dashboard  │
+│  (Cliente)   │ ◄──────► │  reimon.dev          │ ◄──────► │  Dashboard  │
 └──────────────┘          └──────────────────────┘          └─────────────┘
    │                            │
    │ POST /api/sensors          │ ┌─────────────┐
@@ -68,7 +68,7 @@
 
 ### ✅ Estado: OPERACIONAL
 
-**Ubicación:** 168.181.185.42:5591 (SSH)
+**Ubicación:** reimon.dev:5591 (SSH)
 
 **Servicios Activos:**
 - ✅ MongoDB 8.0.15 (localhost:27017)

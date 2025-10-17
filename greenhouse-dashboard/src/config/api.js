@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://168.181.185.42';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://reimon.dev';
 
 export const API_ENDPOINTS = {
   HEALTH: `${API_BASE_URL}/health`,

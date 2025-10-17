@@ -48,16 +48,16 @@ Esta actualización migra el sistema de **polling HTTP** a **WebSocket (Socket.I
 cd /home/reimon/greenhouse/backend-websocket-update
 
 # Subir server.js y configuraciones
-scp -P 5591 server.js root@168.181.185.42:/tmp/
-scp -P 5591 nginx-config-websocket root@168.181.185.42:/tmp/
-scp -P 5591 update-websocket.sh root@168.181.185.42:/tmp/
+scp -P 5591 server.js root@reimon.dev:/tmp/
+scp -P 5591 nginx-config-websocket root@reimon.dev:/tmp/
+scp -P 5591 update-websocket.sh root@reimon.dev:/tmp/
 ```
 
 ### **Paso 2: Ejecutar actualización en el VPS**
 
 ```bash
 # Conectar al VPS
-ssh -p 5591 root@168.181.185.42
+ssh -p 5591 root@reimon.dev
 
 # Ejecutar script de actualización
 cd /tmp
@@ -82,7 +82,7 @@ cd /home/reimon/greenhouse/greenhouse-dashboard
 npm run build
 
 # Deploy al VPS
-scp -P 5591 -r dist/* root@168.181.185.42:/var/www/greenhouse/
+scp -P 5591 -r dist/* root@reimon.dev:/var/www/greenhouse/
 ```
 
 ---

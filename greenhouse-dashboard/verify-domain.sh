@@ -37,12 +37,12 @@ fi
 echo ""
 
 # 4. Verificar DNS
-echo "4️⃣ DNS (reimon.dev → 168.181.185.42):"
+echo "4️⃣ DNS (reimon.dev → IP resuelta):"
 IP=$(dig +short reimon.dev | tail -n1)
-if [ "$IP" = "168.181.185.42" ]; then
-    echo "   ✅ DNS apuntando correctamente"
+if [ -n "$IP" ]; then
+    echo "   ✅ reimon.dev resuelve a: $IP"
 else
-    echo "   ⚠️  DNS apunta a: $IP (esperado: 168.181.185.42)"
+    echo "   ⚠️  No se pudo resolver reimon.dev"
 fi
 echo ""
 

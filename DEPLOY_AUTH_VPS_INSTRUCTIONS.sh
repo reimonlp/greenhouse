@@ -7,7 +7,7 @@ echo "=========================================="
 echo "   DEPLOYMENT DE AUTENTICACIÓN EN VPS"
 echo "=========================================="
 echo ""
-echo "⚠️  IMPORTANTE: Ejecutar estos comandos EN EL VPS (168.181.185.42)"
+echo "⚠️  IMPORTANTE: Ejecutar estos comandos EN EL VPS (reimon.dev)"
 echo ""
 
 # Token generado
@@ -27,8 +27,8 @@ echo "PASO 2: Copiar archivos al VPS"
 echo "=========================================="
 echo ""
 echo "# Desde tu máquina local, copiar archivos actualizados:"
-echo "scp -P 5591 /home/reimon/greenhouse/backend-websocket-update/server.js root@reimon.dev:/tmp/"
-echo "scp -P 5591 /home/reimon/greenhouse/backend-websocket-update/.env root@reimon.dev:/tmp/"
+scp -P 5591 /home/reimon/greenhouse/backend-websocket-update/server.js root@reimon.dev:/tmp/
+scp -P 5591 /home/reimon/greenhouse/backend-websocket-update/.env root@reimon.dev:/tmp/
 echo ""
 echo "=========================================="
 echo "PASO 3: En el VPS, mover archivos y reiniciar"

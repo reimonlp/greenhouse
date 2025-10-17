@@ -6,11 +6,11 @@ set -e
 echo "🔨 Building frontend for production..."
 npm run build
 
-echo "📦 Deploying to VPS (168.181.185.42)..."
+echo "📦 Deploying to VPS (reimon.dev)..."
 rsync -avz --delete \
   --progress \
   dist/ \
-  root@168.181.185.42:/var/www/greenhouse/
+  root@reimon.dev:/var/www/greenhouse/
 
 echo ""
 echo "✅ Deploy completed successfully!"

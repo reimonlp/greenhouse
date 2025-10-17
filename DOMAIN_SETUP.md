@@ -14,7 +14,7 @@ Configurar el dominio `reimon.dev` para acceder al sistema greenhouse:
 Verifica que el dominio apunte a tu VPS:
 ```bash
 dig reimon.dev
-# Debe mostrar: 168.181.185.42
+# Debe mostrar: reimon.dev -> tu IP pública
 ```
 
 ---
@@ -169,10 +169,10 @@ npm install
 npm run build
 
 # Copiar al VPS
-scp -r dist/* root@168.181.185.42:/var/www/greenhouse/
+scp -r dist/* root@reimon.dev:/var/www/greenhouse/
 
 # O con rsync
-rsync -avz --delete dist/ root@168.181.185.42:/var/www/greenhouse/
+rsync -avz --delete dist/ root@reimon.dev:/var/www/greenhouse/
 ```
 
 ---
@@ -193,7 +193,7 @@ npm run build
 echo "📦 Deploying to VPS..."
 rsync -avz --delete \
   dist/ \
-  root@168.181.185.42:/var/www/greenhouse/
+  root@reimon.dev:/var/www/greenhouse/
 
 echo "✅ Deploy completed!"
 echo "🌐 Visit: https://reimon.dev/greenhouse"
@@ -207,7 +207,7 @@ chmod +x greenhouse-dashboard/deploy-domain.sh
 
 ## 🚀 Pasos de Implementación
 
-### **En el VPS (168.181.185.42):**
+### **En el VPS (reimon.dev):**
 
 ```bash
 # 1. Crear directorio para el frontend
@@ -243,7 +243,7 @@ echo "VITE_API_URL=https://reimon.dev/greenhouse/api" > .env.production
 # 3. Build y deploy
 npm install
 npm run build
-rsync -avz --delete dist/ root@168.181.185.42:/var/www/greenhouse/
+rsync -avz --delete dist/ root@reimon.dev:/var/www/greenhouse/
 ```
 
 ---
@@ -297,7 +297,7 @@ base: '/greenhouse/'
 ### **API no responde:**
 ```bash
 # Verificar que el backend esté corriendo
-ssh root@168.181.185.42
+ssh root@reimon.dev
 pm2 list
 pm2 logs greenhouse-backend
 ```
@@ -345,7 +345,7 @@ Ejecuta estos comandos para implementar:
 
 ```bash
 # En el VPS
-ssh root@168.181.185.42
+ssh root@reimon.dev
 # Sigue los pasos de "En el VPS" de arriba
 
 # En tu máquina
