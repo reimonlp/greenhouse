@@ -9,9 +9,11 @@
     using String = std::string;
 #endif
 
-// Incluir credenciales externas opcionales (no versionar secrets.h real)
+// Incluir credenciales externas obligatorias (secrets.h debe existir)
 #if __has_include("secrets.h")
 #include "secrets.h"
+#else
+#error "secrets.h not found! Copy secrets.example.h to secrets.h and configure your credentials."
 #endif
 
 // ========== MACROS DE DEBUG ==========
