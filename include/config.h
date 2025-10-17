@@ -1,3 +1,23 @@
+/**
+ * @file config.h
+ * @brief Central configuration file for ESP32 Greenhouse System
+ * 
+ * This file contains all compile-time configuration constants, timing values,
+ * thresholds, and system parameters. It serves as the single source of truth
+ * for system behavior and eliminates magic numbers throughout the codebase.
+ * 
+ * Organization:
+ * - Debug/Logging configuration
+ * - WiFi and network settings
+ * - Sensor validation parameters
+ * - Timing and interval constants
+ * - Safety and reliability settings
+ * - Feature flags and build options
+ * 
+ * All constants are documented with their units, valid ranges, and purpose.
+ * Changes here affect the entire system's behavior and should be tested thoroughly.
+ */
+
 #ifndef CONFIG_H
 #define CONFIG_H
 

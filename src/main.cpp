@@ -48,6 +48,15 @@ void onSensorRequestReceived() {
     sendSensorData();
 }
 
+/**
+ * @brief Setup WiFi connection with security considerations
+ * 
+ * Establishes WiFi connection to the configured network.
+ * - Uses WPA2 security (configured in secrets.h)
+ * - Implements timeout with watchdog feeding
+ * - Logs connection status but NOT SSID for security
+ * - Restarts ESP32 if connection fails (critical for operation)
+ */
 void setupWiFi() {
     DEBUG_PRINTLN("Connecting to WiFi...");
     // Don't log SSID for security (prevents network name disclosure)
@@ -80,6 +89,15 @@ void setupWiFi() {
     }
 }
 
+/**
+ * @brief Synchronize system time with NTP server
+ * 
+ * Configures NTP client for accurate timestamps.
+ * - Required for sensor data timestamping
+ * - Uses GMT offset and daylight saving configuration
+ * - Non-blocking with timeout (continues if NTP fails)
+ * - Critical for data logging and rule evaluation
+ */
 void setupNTP() {
     DEBUG_PRINTLN("Syncing time...");
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
@@ -187,6 +205,18 @@ void setupOTA() {
 #endif
 }
 
+/**
+ * @brief Send current sensor readings to VPS via WebSocket
+ * 
+ * Reads sensor data and transmits to backend server with error handling:
+ * - Rate-limited to prevent flooding (SENSOR_SEND_INTERVAL_MS)
+ * - Validates sensor readings before transmission
+ * - Includes error counters for sensor health monitoring
+ * - Tracks consecutive failures for circuit breaker pattern
+ * - Non-blocking operation with timeout handling
+ * 
+ * Critical for real-time greenhouse monitoring and automation.
+ */
 void sendSensorData() {
     if (millis() - lastSensorSend < SENSOR_SEND_INTERVAL_MS) {
         return;
@@ -247,6 +277,19 @@ void sendMetrics() {
     }
 }
 
+/**
+ * @brief ESP32 initialization and startup sequence
+ * 
+ * Performs complete system initialization in the correct order:
+ * 1. Serial communication setup
+ * 2. Watchdog timer configuration (critical for reliability)
+ * 3. Hardware initialization (sensors, relays)
+ * 4. Network setup (WiFi, NTP)
+ * 5. VPS communication setup (WebSocket, OTA)
+ * 
+ * This function must complete successfully for the system to operate.
+ * Failure in any step may cause ESP32 restart or degraded operation.
+ */
 void setup() {
     DEBUG_SERIAL_BEGIN(115200);
     delay(SYSTEM_STARTUP_DELAY_MS);
@@ -314,6 +357,20 @@ void setup() {
     DEBUG_PRINTLN("Entering main loop...\n");
 }
 
+/**
+ * @brief Main system loop - executes continuously after setup()
+ * 
+ * Performs all ongoing system operations in priority order:
+ * 1. Watchdog feeding (prevents system reset)
+ * 2. OTA update handling (allows remote firmware updates)
+ * 3. WebSocket communication maintenance
+ * 4. VPS connectivity health checks
+ * 5. Sensor data transmission
+ * 6. System metrics reporting
+ * 
+ * This loop must execute reliably for continuous greenhouse operation.
+ * All operations are designed to be non-blocking to maintain responsiveness.
+ */
 void loop() {
     // Feed the watchdog timer at the start of each loop iteration
     esp_task_wdt_reset();
