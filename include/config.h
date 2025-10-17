@@ -227,11 +227,11 @@ enum RelayMode {
 };
 
 enum LogLevel {
-    LOG_DEBUG,
-    LOG_INFO,
-    LOG_WARNING,
-    LOG_ERROR,
-    LOG_CRITICAL
+    LEVEL_DEBUG,
+    LEVEL_INFO,
+    LEVEL_WARNING,
+    LEVEL_ERROR,
+    LEVEL_CRITICAL
 };
 
 // ========== ESTRUCTURAS DE DATOS ==========
@@ -287,7 +287,7 @@ struct SystemStats {
 // #define VERBOSE_LOGGING 1
 
 // ========== CONTROL DE FEATURES / REDUCCIÓN ==========
-// Nivel mínimo de log compilado (LOG_DEBUG, LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_CRITICAL)
+// Nivel mínimo de log compilado (usa macros LOG_DEBUG, LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_CRITICAL)
 #ifndef MIN_LOG_LEVEL
 #define MIN_LOG_LEVEL LOG_INFO
 #endif
