@@ -358,105 +358,6 @@ void setup() {
 }
 
 /**
- * @brief Process serial commands for testing and debugging
- * 
- * Available commands:
- * - test on/off: Enable/disable sensor test mode
- * - fail temp/hum/both [count]: Simulate sensor failures
- * - status: Show current sensor status
- * - help: Show available commands
- */
-void processSerialCommands() {
-    if (Serial.available() > 0) {
-        String command = Serial.readStringUntil('\n');
-        command.trim();
-        command.toLowerCase();
-        
-        if (command == "help" || command == "h") {
-            Serial.println("\n=== Available Commands ===");
-            Serial.println("test on/off     - Enable/disable sensor test mode");
-            Serial.println("fail temp [n]   - Simulate n temperature errors (default: 3)");
-            Serial.println("fail hum [n]    - Simulate n humidity errors (default: 3)");
-            Serial.println("fail both [n]   - Simulate n errors for both sensors (default: 3)");
-            Serial.println("status          - Show current sensor status");
-            Serial.println("reset           - Reset simulated errors");
-            Serial.println("help            - Show this help");
-            Serial.println();
-            
-        } else if (command == "test on") {
-            sensors.setTestMode(true);
-            Serial.println("[OK] Sensor test mode ENABLED");
-            Serial.println("Use 'fail' commands to simulate sensor failures");
-            
-        } else if (command == "test off") {
-            sensors.setTestMode(false);
-            Serial.println("[OK] Sensor test mode DISABLED");
-            Serial.println("Sensors will return to normal operation");
-            
-        } else if (command.startsWith("fail ")) {
-            if (!sensors.isTestMode()) {
-                Serial.println("[ERROR] Test mode not enabled. Use 'test on' first.");
-                return;
-            }
-            
-            int errorCount = 3; // Default to trigger faulty indicator
-            String params = command.substring(5);
-            int spaceIndex = params.indexOf(' ');
-            
-            String sensorType;
-            if (spaceIndex > 0) {
-                sensorType = params.substring(0, spaceIndex);
-                errorCount = params.substring(spaceIndex + 1).toInt();
-                if (errorCount <= 0) errorCount = 3;
-            } else {
-                sensorType = params;
-            }
-            
-            if (sensorType == "temp") {
-                sensors.simulateSensorFailure(0, errorCount);
-            } else if (sensorType == "hum") {
-                sensors.simulateSensorFailure(1, errorCount);
-            } else if (sensorType == "both") {
-                sensors.simulateSensorFailure(2, errorCount);
-            } else {
-                Serial.println("[ERROR] Invalid sensor type. Use: temp, hum, or both");
-            }
-            
-        } else if (command == "status") {
-            Serial.println("\n=== Sensor Status ===");
-            Serial.printf("Test Mode: %s\n", sensors.isTestMode() ? "ENABLED" : "DISABLED");
-            Serial.printf("Temperature Errors: %d/%d\n", sensors.getTempErrors(), SENSOR_MAX_CONSECUTIVE_ERRORS);
-            Serial.printf("Humidity Errors: %d/%d\n", sensors.getHumidityErrors(), SENSOR_MAX_CONSECUTIVE_ERRORS);
-            
-            SensorData current = sensors.getCurrentData();
-            SensorData lastValid = sensors.getLastValidData();
-            
-            Serial.println("\nCurrent Readings:");
-            Serial.printf("  Temperature: %.1f°C (valid: %s)\n", current.temperature, current.valid ? "YES" : "NO");
-            Serial.printf("  Humidity: %.1f%% (valid: %s)\n", current.humidity, current.valid ? "YES" : "NO");
-            
-            Serial.println("\nLast Valid Readings:");
-            Serial.printf("  Temperature: %.1f°C\n", lastValid.temperature);
-            Serial.printf("  Humidity: %.1f%%\n", lastValid.humidity);
-            Serial.println();
-            
-        } else if (command == "reset") {
-            if (sensors.isTestMode()) {
-                sensors.simulateSensorFailure(0, 0); // Reset temperature errors
-                sensors.simulateSensorFailure(1, 0); // Reset humidity errors
-                Serial.println("[OK] Simulated errors reset");
-            } else {
-                Serial.println("[ERROR] Test mode not enabled");
-            }
-            
-        } else if (command.length() > 0) {
-            Serial.printf("[ERROR] Unknown command: %s\n", command.c_str());
-            Serial.println("Type 'help' for available commands");
-        }
-    }
-}
-
-/**
  * @brief Main system loop - executes continuously after setup()
  * 
  * Performs all ongoing system operations in priority order:
@@ -483,7 +384,6 @@ void loop() {
     checkVPSHealth();
     sendSensorData();
     sendMetrics();
-    processSerialCommands();  // Process serial commands for testing
     delay(LOOP_ITERATION_DELAY_MS);
     yield();
 }
