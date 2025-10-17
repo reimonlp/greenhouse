@@ -155,6 +155,10 @@ bool SensorManager::readSensors() {
                        consecutiveHumidityErrors);
         }
         
+        // Use last valid readings when current readings are invalid
+        currentData.temperature = lastValidTemp;
+        currentData.humidity = lastValidHumidity;
+        currentData.timestamp = now;
         currentData.valid = false;
     }
     
