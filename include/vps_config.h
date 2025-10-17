@@ -38,7 +38,7 @@
 // Security - Authentication token
 // MUST be defined in secrets.h - no default provided for security
 #ifndef DEVICE_AUTH_TOKEN
-#error "DEVICE_AUTH_TOKEN must be defined in secrets.h"
+#error "DEVICE_AUTH_TOKEN must be defined in secrets.h - this is a security requirement. Copy secrets.example.h to secrets.h and configure your authentication token."
 #endif
 
 // ========== WEBSOCKET CONFIGURATION ==========

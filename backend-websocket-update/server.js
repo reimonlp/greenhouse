@@ -247,7 +247,8 @@ io.on('connection', (socket) => {
         }
       });
     } catch (error) {
-      console.error('❌ [ERROR] Failed to update relay state:', error.message);
+      console.error('❌ [ERROR] Failed to update relay state in database:', error.message);
+      console.error('   Relay data:', JSON.stringify({ relay_id: data.relay_id, state: data.state, mode: data.mode }));
     }
   });
   
@@ -274,7 +275,8 @@ io.on('connection', (socket) => {
         metadata: { device_id: data.device_id }
       });
     } catch (error) {
-      console.error('❌ [ERROR] Failed to save ESP32 log:', error.message);
+      console.error('❌ [ERROR] Failed to save ESP32 log entry to database:', error.message);
+      console.error('   Log data:', JSON.stringify({ level: data.level, message: data.message?.substring(0, 100) }));
     }
   });
   

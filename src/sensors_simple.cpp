@@ -147,11 +147,11 @@ bool SensorManager::readSensors() {
     } else {
         // Check if sensor might be faulty
         if (consecutiveTempErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
-            LOG_ERRORF("Temperature sensor possibly faulty: %d consecutive errors\n", 
+            LOG_ERRORF("Temperature sensor validation failed: %d consecutive errors - sensor may be malfunctioning or disconnected\n", 
                        consecutiveTempErrors);
         }
         if (consecutiveHumidityErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
-            LOG_ERRORF("Humidity sensor possibly faulty: %d consecutive errors\n", 
+            LOG_ERRORF("Humidity sensor validation failed: %d consecutive errors - sensor may be malfunctioning or disconnected\n", 
                        consecutiveHumidityErrors);
         }
         
