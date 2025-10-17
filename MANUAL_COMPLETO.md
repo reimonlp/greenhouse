@@ -68,7 +68,7 @@
 
 **Software:**
 - PlatformIO IDE o VS Code con PlatformIO extension
-- Node.js 16+ (para backend)
+- Node.js 18+ (para backend)
 - MongoDB (base de datos)
 - Nginx (servidor web)
 
@@ -190,9 +190,9 @@ npm run build
 - Reconexión automática
 
 **WebSocket:**
-- Host: `localhost`
+- Host: `greenhouse.reimon.dev`
 - Puerto: 443 (SSL)
-- Path: `/greenhouse/socket.io/?EIO=4&transport=websocket`
+- Path: `/socket.io/?EIO=4&transport=websocket`
 
 **OTA Updates:**
 - Puerto: 3232
@@ -583,15 +583,15 @@ sudo cp -r dist/* /var/www/greenhouse/
 - WebSockets 2.7.1
 
 **Backend:**
-- Node.js 16+
+- Node.js 18+
 - Express 4.x
 - Socket.IO 4.x
-- MongoDB 5.x
+- MongoDB 8.x
 - PM2 (process manager)
 
 **Frontend:**
-- React 18
-- Material-UI 5.x
+- React 19
+- Material-UI 7.x
 - Vite 7.x
 - Axios 1.x
 
