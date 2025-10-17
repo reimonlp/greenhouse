@@ -64,9 +64,6 @@ private:
     int _consecutiveFailures;
     bool _circuitBreakerOpen;
     unsigned long _circuitBreakerOpenTime;
-    static const int CIRCUIT_BREAKER_THRESHOLD = 10;  // Open after 10 consecutive failures
-    static const unsigned long CIRCUIT_BREAKER_TIMEOUT = 300000;  // 5 minutes
-    static const unsigned long CIRCUIT_BREAKER_TEST_INTERVAL = 60000;  // Test every 1 minute
     
     // Callbacks
     RelayCommandCallback _relayCommandCallback;

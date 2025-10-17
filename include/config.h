@@ -174,6 +174,9 @@
 // Health Checks & Monitoring
 #define HEALTH_CHECK_INTERVAL_MS        60000   // Check VPS health every 60s
 #define METRICS_SEND_INTERVAL_MS        300000  // Send metrics every 5 minutes
+#define CIRCUIT_BREAKER_THRESHOLD       10      // Open circuit after 10 consecutive failures
+#define CIRCUIT_BREAKER_TIMEOUT_MS      300000  // Circuit breaker timeout (5 minutes)
+#define CIRCUIT_BREAKER_TEST_INTERVAL_MS 60000  // Test circuit every 1 minute
 #define CIRCUIT_BREAKER_TEST_MOD_MS     1000    // Circuit breaker test modulo
 
 // Sensor Reading

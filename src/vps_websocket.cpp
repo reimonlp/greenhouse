@@ -54,9 +54,9 @@ void VPSWebSocketClient::loop() {
     if (_circuitBreakerOpen) {
         unsigned long timeSinceOpen = millis() - _circuitBreakerOpenTime;
         
-        if (timeSinceOpen >= CIRCUIT_BREAKER_TIMEOUT) {
+        if (timeSinceOpen >= CIRCUIT_BREAKER_TIMEOUT_MS) {
             // Try one test connection after timeout
-            if (timeSinceOpen % CIRCUIT_BREAKER_TEST_INTERVAL < CIRCUIT_BREAKER_TEST_MOD_MS) {
+            if (timeSinceOpen % CIRCUIT_BREAKER_TEST_INTERVAL_MS < CIRCUIT_BREAKER_TEST_MOD_MS) {
                 LOG_INFOF("Circuit breaker: Testing connection (failure count: %d)\n", _consecutiveFailures);
                 _circuitBreakerOpen = false;
                 _consecutiveFailures = 0;  // Reset on test attempt
@@ -161,7 +161,7 @@ void VPSWebSocketClient::handleDisconnected() {
         _circuitBreakerOpen = true;
         _circuitBreakerOpenTime = millis();
         LOG_ERRORF("Circuit breaker OPEN: %d consecutive failures. Pausing for %lu seconds\n", 
-                   _consecutiveFailures, CIRCUIT_BREAKER_TIMEOUT / 1000);
+                   _consecutiveFailures, CIRCUIT_BREAKER_TIMEOUT_MS / 1000);
     }
     
     DEBUG_PRINTLN("✗ WebSocket disconnected from VPS");
