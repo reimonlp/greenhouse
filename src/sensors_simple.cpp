@@ -20,6 +20,12 @@ SensorManager::SensorManager() {
     // Initialize data
     currentData = {0.0, 0.0, 0.0, 0.0, 0, false};
     lastValidData = currentData;
+    
+    // Initialize validation tracking
+    lastValidTemp = 20.0f;  // Reasonable default
+    lastValidHumidity = 50.0f;  // Reasonable default
+    consecutiveTempErrors = 0;
+    consecutiveHumidityErrors = 0;
 }
 
 SensorManager::~SensorManager() {
@@ -46,6 +52,72 @@ bool SensorManager::begin() {
     return true;
 }
 
+bool SensorManager::validateTemperature(float temp) {
+    // Check for NaN
+    if (isnan(temp)) {
+        LOG_WARNF("Temperature validation failed: NaN value\n");
+        consecutiveTempErrors++;
+        return false;
+    }
+    
+    // Check DHT11 datasheet range (0°C to 50°C)
+    if (temp < DHT11_MIN_TEMP || temp > DHT11_MAX_TEMP) {
+        LOG_WARNF("Temperature out of range: %.1f°C (valid: %.0f-%.0f°C)\n", 
+                  temp, DHT11_MIN_TEMP, DHT11_MAX_TEMP);
+        consecutiveTempErrors++;
+        return false;
+    }
+    
+    // Check for abrupt changes (possible sensor glitch)
+    if (consecutiveTempErrors < SENSOR_MAX_CONSECUTIVE_ERRORS) {
+        float change = abs(temp - lastValidTemp);
+        if (change > MAX_TEMP_CHANGE_PER_READ) {
+            LOG_WARNF("Temperature change too abrupt: %.1f°C change (max: %.1f°C)\n", 
+                      change, MAX_TEMP_CHANGE_PER_READ);
+            consecutiveTempErrors++;
+            return false;
+        }
+    }
+    
+    // Valid reading - reset error counter and update last valid
+    consecutiveTempErrors = 0;
+    lastValidTemp = temp;
+    return true;
+}
+
+bool SensorManager::validateHumidity(float humidity) {
+    // Check for NaN
+    if (isnan(humidity)) {
+        LOG_WARNF("Humidity validation failed: NaN value\n");
+        consecutiveHumidityErrors++;
+        return false;
+    }
+    
+    // Check DHT11 datasheet range (20% to 90%)
+    if (humidity < DHT11_MIN_HUMIDITY || humidity > DHT11_MAX_HUMIDITY) {
+        LOG_WARNF("Humidity out of range: %.1f%% (valid: %.0f-%.0f%%)\n", 
+                  humidity, DHT11_MIN_HUMIDITY, DHT11_MAX_HUMIDITY);
+        consecutiveHumidityErrors++;
+        return false;
+    }
+    
+    // Check for abrupt changes (possible sensor glitch)
+    if (consecutiveHumidityErrors < SENSOR_MAX_CONSECUTIVE_ERRORS) {
+        float change = abs(humidity - lastValidHumidity);
+        if (change > MAX_HUMIDITY_CHANGE_PER_READ) {
+            LOG_WARNF("Humidity change too abrupt: %.1f%% change (max: %.1f%%)\n", 
+                      change, MAX_HUMIDITY_CHANGE_PER_READ);
+            consecutiveHumidityErrors++;
+            return false;
+        }
+    }
+    
+    // Valid reading - reset error counter and update last valid
+    consecutiveHumidityErrors = 0;
+    lastValidHumidity = humidity;
+    return true;
+}
+
 bool SensorManager::readSensors() {
     unsigned long now = millis();
     
@@ -56,11 +128,15 @@ bool SensorManager::readSensors() {
     
     lastReadTime = now;
     
-    // Read DHT22
+    // Read DHT11
     float temp = dht->readTemperature();
     float hum = dht->readHumidity();
     
-    lastDhtValid = (!isnan(temp) && !isnan(hum) && temp > -40 && temp < 80 && hum >= 0 && hum <= 100);
+    // Validate readings using new validation functions
+    bool tempValid = validateTemperature(temp);
+    bool humValid = validateHumidity(hum);
+    
+    lastDhtValid = (tempValid && humValid);
     
     if (lastDhtValid) {
         currentData.temperature = temp;
@@ -69,7 +145,16 @@ bool SensorManager::readSensors() {
         currentData.valid = true;
         lastValidData = currentData;
     } else {
-        DEBUG_PRINTLN("⚠ DHT22 reading failed");
+        // Check if sensor might be faulty
+        if (consecutiveTempErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
+            LOG_ERRORF("Temperature sensor possibly faulty: %d consecutive errors\n", 
+                       consecutiveTempErrors);
+        }
+        if (consecutiveHumidityErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
+            LOG_ERRORF("Humidity sensor possibly faulty: %d consecutive errors\n", 
+                       consecutiveHumidityErrors);
+        }
+        
         currentData.valid = false;
     }
     

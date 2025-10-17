@@ -17,9 +17,17 @@ private:
     bool lastSoilComplete;
     SensorData currentData;
     SensorData lastValidData;
+    
+    // Sensor validation tracking
+    float lastValidTemp;
+    float lastValidHumidity;
+    int consecutiveTempErrors;
+    int consecutiveHumidityErrors;
 
     float readSoilMoisture(int pin);
     float convertSoilMoistureToPercentage(float rawValue, int sensor);
+    bool validateTemperature(float temp);
+    bool validateHumidity(float humidity);
 
 public:
     SensorManager();

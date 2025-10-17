@@ -115,6 +115,20 @@
 #define SOIL_SAMPLE_INTERVAL_MS 10
 #endif
 
+// ========== VALIDACIÓN DE RANGOS DHT11 ==========
+// DHT11 datasheet specifications
+#define DHT11_MIN_TEMP          0.0f    // DHT11 minimum temperature (°C)
+#define DHT11_MAX_TEMP          50.0f   // DHT11 maximum temperature (°C)
+#define DHT11_MIN_HUMIDITY      20.0f   // DHT11 minimum humidity (%)
+#define DHT11_MAX_HUMIDITY      90.0f   // DHT11 maximum humidity (%)
+
+// Anomaly detection thresholds
+#define MAX_TEMP_CHANGE_PER_READ    10.0f   // Maximum °C change between consecutive reads
+#define MAX_HUMIDITY_CHANGE_PER_READ 20.0f  // Maximum % change between consecutive reads
+
+// Error handling
+#define SENSOR_MAX_CONSECUTIVE_ERRORS 3     // Max errors before marking sensor as faulty
+
 // ========== CONFIGURACIÓN DE MÉTRICAS ==========
 #ifndef LOOP_EMA_ALPHA
 #define LOOP_EMA_ALPHA 0.05f
