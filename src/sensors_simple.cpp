@@ -26,6 +26,11 @@ SensorManager::SensorManager() {
     lastValidHumidity = 50.0f;  // Reasonable default
     consecutiveTempErrors = 0;
     consecutiveHumidityErrors = 0;
+    
+    // Initialize test mode
+    testMode = false;
+    simulatedTempErrors = 0;
+    simulatedHumidityErrors = 0;
 }
 
 SensorManager::~SensorManager() {
@@ -135,6 +140,16 @@ bool SensorManager::readSensors() {
     // Validate readings using new validation functions
     bool tempValid = validateTemperature(temp);
     bool humValid = validateHumidity(hum);
+    
+    // Override validation in test mode
+    if (testMode) {
+        if (simulatedTempErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
+            tempValid = false;
+        }
+        if (simulatedHumidityErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
+            humValid = false;
+        }
+    }
     
     lastDhtValid = (tempValid && humValid);
     
@@ -254,3 +269,34 @@ bool SensorManager::updateSoilSampling() { return lastSoilComplete; }
 SystemStats SensorManager::getStatistics() { return SystemStats(); }
 void SensorManager::resetStatistics() {}
 void SensorManager::updateStatistics(const SensorData& data) {}
+
+/**
+ * @brief Simulate sensor failures for testing purposes
+ * @param sensorType 0=temperature, 1=humidity, 2=both
+ * @param errorCount Number of consecutive errors to simulate (default: 3 to trigger faulty indicator)
+ */
+void SensorManager::simulateSensorFailure(int sensorType, int errorCount) {
+    if (!testMode) {
+        LOG_INFOF("Test mode not enabled. Use 'test on' command first.\n");
+        return;
+    }
+    
+    switch (sensorType) {
+        case 0: // Temperature only
+            simulatedTempErrors = errorCount;
+            LOG_INFOF("Simulating %d consecutive temperature sensor errors\n", errorCount);
+            break;
+        case 1: // Humidity only
+            simulatedHumidityErrors = errorCount;
+            LOG_INFOF("Simulating %d consecutive humidity sensor errors\n", errorCount);
+            break;
+        case 2: // Both sensors
+            simulatedTempErrors = errorCount;
+            simulatedHumidityErrors = errorCount;
+            LOG_INFOF("Simulating %d consecutive errors for both sensors\n", errorCount);
+            break;
+        default:
+            LOG_WARNF("Invalid sensor type: %d (use 0=temp, 1=humidity, 2=both)\n", sensorType);
+            break;
+    }
+}

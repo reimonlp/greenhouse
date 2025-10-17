@@ -43,6 +43,11 @@ private:
     bool validateTemperature(float temp);
     bool validateHumidity(float humidity);
 
+    // Test mode variables
+    bool testMode;
+    int simulatedTempErrors;
+    int simulatedHumidityErrors;
+
 public:
     SensorManager();
     ~SensorManager();
@@ -94,6 +99,11 @@ public:
     // Sensor health monitoring
     int getTempErrors() const { return consecutiveTempErrors; }
     int getHumidityErrors() const { return consecutiveHumidityErrors; }
+    
+    // Test mode for simulating sensor failures
+    void setTestMode(bool enabled) { testMode = enabled; }
+    bool isTestMode() const { return testMode; }
+    void simulateSensorFailure(int sensorType, int errorCount = 3);
     
     // Simplified stubs for compatibility
     bool updateSoilSampling();
