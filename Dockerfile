@@ -8,7 +8,7 @@ WORKDIR /app/frontend
 COPY greenhouse-dashboard/package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy frontend source
 COPY greenhouse-dashboard/ ./
@@ -34,7 +34,7 @@ WORKDIR /app/backend
 COPY backend-websocket-update/package*.json ./
 
 # Install backend dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy backend source
 COPY backend-websocket-update/ ./
