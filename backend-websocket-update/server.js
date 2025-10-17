@@ -182,7 +182,9 @@ io.on('connection', (socket) => {
         device_id: data.device_id || 'ESP32_GREENHOUSE_01',
         temperature: data.temperature,
         humidity: data.humidity,
-        soil_moisture: data.soil_moisture
+        soil_moisture: data.soil_moisture,
+        temp_errors: data.temp_errors || 0,
+        humidity_errors: data.humidity_errors || 0
       });
       
       // Broadcast to all connected clients (dashboard)

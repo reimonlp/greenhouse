@@ -1,7 +1,7 @@
-import { Card, CardContent, Typography, Box } from '@mui/material';
-import { TrendingUp, TrendingDown } from '@mui/icons-material';
+import { Card, CardContent, Typography, Box, Chip } from '@mui/material';
+import { TrendingUp, TrendingDown, Warning } from '@mui/icons-material';
 
-function SensorCard({ title, value, unit, icon, color }) {
+function SensorCard({ title, value, unit, icon, color, errorCount = 0 }) {
   const formattedValue = typeof value === 'number' ? value.toFixed(1) : '0.0';
   
   // Determine if value is in good range (simplified logic)
@@ -52,7 +52,15 @@ function SensorCard({ title, value, unit, icon, color }) {
 
         {/* Status indicator */}
         <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-          {value > 0 ? (
+          {errorCount >= 3 ? (
+            <Chip 
+              icon={<Warning />} 
+              label="Sensor Defectuoso" 
+              color="error" 
+              size="small"
+              sx={{ fontWeight: 'bold' }}
+            />
+          ) : value > 0 ? (
             <>
               <TrendingUp sx={{ fontSize: 16, color: getStatusColor(), mr: 0.5 }} />
               <Typography variant="caption" sx={{ color: getStatusColor() }}>

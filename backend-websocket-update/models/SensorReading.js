@@ -18,6 +18,14 @@ const sensorReadingSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  temp_errors: {
+    type: Number,
+    default: 0
+  },
+  humidity_errors: {
+    type: Number,
+    default: 0
+  },
   timestamp: {
     type: Date,
     default: Date.now,

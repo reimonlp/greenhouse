@@ -41,6 +41,10 @@ public:
     bool isDataValid(const SensorData& data);
     String getLastError();
     
+    // Sensor health monitoring
+    int getTempErrors() const { return consecutiveTempErrors; }
+    int getHumidityErrors() const { return consecutiveHumidityErrors; }
+    
     // Simplified stubs for compatibility
     bool updateSoilSampling();
     SystemStats getStatistics();

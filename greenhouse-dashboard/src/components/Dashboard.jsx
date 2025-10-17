@@ -145,6 +145,7 @@ function Dashboard() {
               unit="°C"
               icon={<Thermostat />}
               color="#ef5350"
+              errorCount={sensorData?.temp_errors || 0}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -154,6 +155,7 @@ function Dashboard() {
               unit="%"
               icon={<Opacity />}
               color="#42a5f5"
+              errorCount={sensorData?.humidity_errors || 0}
             />
           </Grid>
           <Grid item xs={12} md={4}>

@@ -200,13 +200,15 @@ void sendSensorData() {
     
     float temp = data.temperature;
     float hum = data.humidity;
+    int tempErrors = sensors.getTempErrors();
+    int humErrors = sensors.getHumidityErrors();
     
     if (isnan(temp) || isnan(hum)) {
         DEBUG_PRINTLN("✗ Invalid sensor readings, skipping");
         return;
     }
     
-    bool success = vpsWebSocket.sendSensorData(temp, hum);
+    bool success = vpsWebSocket.sendSensorData(temp, hum, -1, tempErrors, humErrors);
     
     if (!success) {
         failedRequests++;

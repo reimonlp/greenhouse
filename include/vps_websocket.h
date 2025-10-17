@@ -33,7 +33,7 @@ public:
     bool isConnected();
     
     // Send data to server
-    bool sendSensorData(float temperature, float humidity, float soilMoisture = -1);
+    bool sendSensorData(float temperature, float humidity, float soilMoisture = -1, int tempErrors = 0, int humidityErrors = 0);
     bool sendRelayState(int relayId, bool state, const char* mode = "manual", const char* changedBy = "esp32");
     bool sendLog(const char* level, const char* message);
     bool sendMetrics(const ConnectionMetrics& metrics);

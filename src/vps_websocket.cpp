@@ -302,7 +302,7 @@ void VPSWebSocketClient::handleSensorRequest() {
     }
 }
 
-bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float soilMoisture) {
+bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float soilMoisture, int tempErrors, int humidityErrors) {
     if (!_connected) {
         DEBUG_PRINTLN("Cannot send sensor data: not connected");
         return false;
@@ -312,6 +312,8 @@ bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float
     data["device_id"] = DEVICE_ID;
     data["temperature"] = temperature;
     data["humidity"] = humidity;
+    data["temp_errors"] = tempErrors;
+    data["humidity_errors"] = humidityErrors;
     
     if (soilMoisture >= 0) {
         data["soil_moisture"] = soilMoisture;
