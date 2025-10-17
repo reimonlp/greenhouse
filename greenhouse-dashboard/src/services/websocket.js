@@ -11,7 +11,7 @@ class WebSocketService {
 
   connect() {
     if (this.socket?.connected) {
-      console.log('WebSocket ya está conectado');
+      // WebSocket ya está conectado - silent
       return;
     }
 
@@ -20,7 +20,7 @@ class WebSocketService {
     // Necesitamos conectar a https://reimon.dev con path /greenhouse/socket.io/
     const serverUrl = API_BASE_URL.replace('/greenhouse', '');
     
-    console.log('Conectando a WebSocket:', serverUrl, 'con path: /greenhouse/socket.io/');
+    // Silent connection - no log noise
     
     this.socket = io(serverUrl, {
       path: '/greenhouse/socket.io/',
@@ -36,13 +36,13 @@ class WebSocketService {
 
   setupEventHandlers() {
     this.socket.on('connect', () => {
-      console.log('✓ WebSocket conectado:', this.socket.id);
+      // Silent connection success
       this.reconnectAttempts = 0;
       this.emit('connection:status', { connected: true });
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('✗ WebSocket desconectado:', reason);
+      // Silent disconnection
       this.emit('connection:status', { connected: false, reason });
     });
 
@@ -51,38 +51,38 @@ class WebSocketService {
       this.reconnectAttempts++;
       
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('Máximo de intentos de reconexión alcanzado');
+        // Silent - max reconnection attempts reached
         this.emit('connection:failed', { error });
       }
     });
 
     this.socket.on('connected', (data) => {
-      console.log('Mensaje del servidor:', data);
+      // Silent server message
     });
 
     // Eventos del servidor
     this.socket.on('sensor:new', (data) => {
-      console.log('Nueva lectura de sensor:', data);
+      // Silent sensor data
       this.emit('sensor:new', data);
     });
 
     this.socket.on('relay:changed', (data) => {
-      console.log('Estado de relay cambiado:', data);
+      // Silent relay change
       this.emit('relay:changed', data);
     });
 
     this.socket.on('rule:created', (data) => {
-      console.log('Regla creada:', data);
+      // Silent rule creation
       this.emit('rule:created', data);
     });
 
     this.socket.on('rule:updated', (data) => {
-      console.log('Regla actualizada:', data);
+      // Silent rule update
       this.emit('rule:updated', data);
     });
 
     this.socket.on('rule:deleted', (data) => {
-      console.log('Regla eliminada:', data);
+      // Silent rule deletion
       this.emit('rule:deleted', data);
     });
   }
@@ -122,7 +122,7 @@ class WebSocketService {
 
   disconnect() {
     if (this.socket) {
-      console.log('Desconectando WebSocket...');
+      // Silent disconnection
       this.socket.disconnect();
       this.socket = null;
       this.listeners.clear();
