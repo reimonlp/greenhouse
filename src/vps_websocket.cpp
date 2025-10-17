@@ -147,7 +147,7 @@ void VPSWebSocketClient::handleConnected() {
     if (_metrics.totalConnections > 1) {
         _metrics.reconnections++;
     }
-    DEBUG_PRINTLN("✓ WebSocket connected to VPS!");
+    DEBUG_PRINTLN("[OK] WebSocket connected to VPS!");
 }
 
 void VPSWebSocketClient::handleDisconnected() {
@@ -177,7 +177,7 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
     char packetType = payload[0];
     
     if (packetType == '0') {
-        DEBUG_PRINTLN("✓ Connected to server");
+        DEBUG_PRINTLN("[OK] Connected to server");
         _webSocket.sendTXT("40");
         
         delay(100);
@@ -194,7 +194,7 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
             delay(10);
         }
         
-        DEBUG_PRINTLN("✓ Device registered");
+        DEBUG_PRINTLN("[OK] Device registered");
         
         return;
     }
@@ -226,7 +226,7 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
         DEBUG_PRINTF("Event received: %s\n", eventName);
         
         if (strcmp(eventName, "device:auth_success") == 0) {
-            DEBUG_PRINTLN("✓ Authentication successful");
+            DEBUG_PRINTLN("[OK] Authentication successful");
             _authFailed = false;
             _authFailureCount = 0;
             
@@ -387,7 +387,7 @@ bool VPSWebSocketClient::sendRelayState(int relayId, bool state, const char* mod
     }
     
     _webSocket.sendTXT(payload);
-    DEBUG_PRINTF("✓ Relay %d: %s\n", relayId, state ? "ON" : "OFF");
+    DEBUG_PRINTF("[OK] Relay %d: %s\n", relayId, state ? "ON" : "OFF");
     
     return true;
 }

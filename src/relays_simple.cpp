@@ -54,7 +54,7 @@ bool RelayManager::begin() {
         DEBUG_PRINTF("  Relay %d (%s): PIN %d - OFF\n", i, relayName(i).c_str(), relayPins[i]);
     }
     
-    DEBUG_PRINTLN("✓ Relays initialized");
+    DEBUG_PRINTLN("[OK] Relays initialized");
     return true;
 }
 

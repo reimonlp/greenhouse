@@ -22,13 +22,13 @@ VPSClient::VPSClient() {
         // Load root CA certificate for SSL verification
         // This prevents MITM attacks by validating server identity
         secureClient.setCACertBundle(x509_crt_bundle_start);  // Use built-in CA bundle
-        DEBUG_PRINTLN("✓ SSL certificate verification ENABLED");
+        DEBUG_PRINTLN("[OK] SSL certificate verification ENABLED");
     #else
         // Development mode: Skip certificate verification
-        // ⚠️ WARNING: Vulnerable to MITM attacks - DO NOT use in production!
+        // WARNING: Vulnerable to MITM attacks - DO NOT use in production!
         secureClient.setInsecure();
-        DEBUG_PRINTLN("⚠ SSL certificate verification DISABLED (development mode)");
-        DEBUG_PRINTLN("   Enable with -DVERIFY_SSL_CERT in platformio.ini for production");
+        DEBUG_PRINTLN("[WARN] SSL certificate verification DISABLED (development mode)");
+        DEBUG_PRINTLN("       Enable with -DVERIFY_SSL_CERT in platformio.ini for production");
     #endif
 }
 
@@ -140,9 +140,9 @@ bool VPSClient::sendRelayState(int relayId, bool state, const char* mode, const 
     bool result = makeRequest("POST", endpoint, payload.c_str(), nullptr);
     
     if (result) {
-        DEBUG_PRINTLN("✓ Relay state sent successfully");
+        DEBUG_PRINTLN("[OK] Relay state sent successfully");
     } else {
-        DEBUG_PRINTF("✗ Failed to send relay state: %s\n", _lastError.c_str());
+        DEBUG_PRINTF("[ERROR] Failed to send relay state: %s\n", _lastError.c_str());
     }
     
     return result;
@@ -178,7 +178,7 @@ bool VPSClient::getRelayStates(bool states[4]) {
         }
     }
     
-    DEBUG_PRINTLN("✓ Relay states retrieved successfully");
+    DEBUG_PRINTLN("[OK] Relay states retrieved successfully");
     return true;
 }
 
@@ -190,11 +190,11 @@ String VPSClient::getRules(int relayId) {
     
     String response;
     if (!makeRequest("GET", endpoint.c_str(), nullptr, &response)) {
-        DEBUG_PRINTF("✗ Failed to get rules: %s\n", _lastError.c_str());
+        DEBUG_PRINTF("[ERROR] Failed to get rules: %s\n", _lastError.c_str());
         return "";
     }
     
-    DEBUG_PRINTLN("✓ Rules retrieved successfully");
+    DEBUG_PRINTLN("[OK] Rules retrieved successfully");
     return response;
 }
 
@@ -218,9 +218,9 @@ bool VPSClient::createRule(int relayId, const char* sensor, const char* op, floa
     bool result = makeRequest("POST", VPS_ENDPOINT_RULES, payload.c_str(), nullptr);
     
     if (result) {
-        DEBUG_PRINTLN("✓ Rule created successfully");
+        DEBUG_PRINTLN("[OK] Rule created successfully");
     } else {
-        DEBUG_PRINTF("✗ Failed to create rule: %s\n", _lastError.c_str());
+        DEBUG_PRINTF("[ERROR] Failed to create rule: %s\n", _lastError.c_str());
     }
     
     return result;
@@ -234,9 +234,9 @@ bool VPSClient::deleteRule(const String& ruleId) {
     bool result = makeRequest("DELETE", endpoint, nullptr, nullptr);
     
     if (result) {
-        DEBUG_PRINTLN("✓ Rule deleted successfully");
+        DEBUG_PRINTLN("[OK] Rule deleted successfully");
     } else {
-        DEBUG_PRINTF("✗ Failed to delete rule: %s\n", _lastError.c_str());
+        DEBUG_PRINTF("[ERROR] Failed to delete rule: %s\n", _lastError.c_str());
     }
     
     return result;
@@ -279,7 +279,7 @@ bool VPSClient::healthCheck() {
     
     // Safety check for NULL pointers
     if (!status || !database) {
-        DEBUG_PRINTLN("✗ VPS health check: Invalid response (NULL fields)");
+        DEBUG_PRINTLN("[ERROR] VPS health check: Invalid response (NULL fields)");
         DEBUG_PRINTF("  Response: %s\n", response.c_str());
         return false;
     }
@@ -287,9 +287,9 @@ bool VPSClient::healthCheck() {
     bool healthy = (strcmp(status, "ok") == 0 && strcmp(database, "connected") == 0);
     
     if (healthy) {
-        DEBUG_PRINTLN("✓ VPS health check: OK");
+        DEBUG_PRINTLN("[OK] VPS health check: OK");
     } else {
-        DEBUG_PRINTF("⚠ VPS health check: status=%s, database=%s\n", status, database);
+        DEBUG_PRINTF("[WARN] VPS health check: status=%s, database=%s\n", status, database);
     }
     
     return healthy;

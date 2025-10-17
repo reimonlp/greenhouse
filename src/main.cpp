@@ -66,7 +66,7 @@ void setupWiFi() {
     }
     
     if (WiFi.status() == WL_CONNECTED) {
-        DEBUG_PRINTLN("\n✓ WiFi connected");
+        DEBUG_PRINTLN("\n[OK] WiFi connected");
         DEBUG_PRINT("IP address: ");
         DEBUG_PRINTLN(WiFi.localIP());
         DEBUG_PRINT("Signal strength: ");
@@ -93,10 +93,10 @@ void setupNTP() {
     }
     
     if (attempts < 10) {
-        DEBUG_PRINTLN("✓ Time synchronized");
+        DEBUG_PRINTLN("[OK] Time synchronized");
         DEBUG_PRINTLN(&timeinfo, "%Y-%m-%d %H:%M:%S");
     } else {
-        DEBUG_PRINTLN("⚠ Time sync failed");
+        DEBUG_PRINTLN("[WARN] Time sync failed");
     }
 }
 
@@ -110,7 +110,7 @@ void checkVPSHealth() {
     
     if (vpsConnected) {
         failedRequests = 0;
-        DEBUG_PRINTLN("✓ WebSocket connected - system healthy");
+        DEBUG_PRINTLN("[OK] WebSocket connected - system healthy");
     } else {
         failedRequests++;
         DEBUG_PRINTF("⚠ WebSocket disconnected (%d/%d)\n", failedRequests, MAX_FAILED_REQUESTS);
@@ -139,13 +139,13 @@ void setupOTA() {
     // OTA callbacks for monitoring
     ArduinoOTA.onStart([]() {
         String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-        DEBUG_PRINTLN("\n🔄 OTA Update Started: " + type);
+        DEBUG_PRINTLN("\n[OTA] Update Started: " + type);
         // Disable watchdog during OTA update
         esp_task_wdt_delete(NULL);
     });
     
     ArduinoOTA.onEnd([]() {
-        DEBUG_PRINTLN("\n✅ OTA Update Completed");
+        DEBUG_PRINTLN("\n[OTA] Update Completed");
     });
     
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -158,7 +158,7 @@ void setupOTA() {
     });
     
     ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("❌ OTA Error[%u]: ", error);
+        Serial.printf("[ERROR] OTA Error[%u]: ", error);
         if (error == OTA_AUTH_ERROR) {
             Serial.println("Auth Failed");
         } else if (error == OTA_BEGIN_ERROR) {
@@ -176,7 +176,7 @@ void setupOTA() {
     });
     
     ArduinoOTA.begin();
-    DEBUG_PRINTLN("✓ OTA Ready");
+    DEBUG_PRINTLN("[OK] OTA Ready");
     DEBUG_PRINT("  Hostname: ");
     DEBUG_PRINTLN(OTA_HOSTNAME);
     DEBUG_PRINT("  Port: ");
@@ -239,9 +239,9 @@ void sendMetrics() {
     
     bool success = vpsWebSocket.sendMetrics(metrics);
     if (success) {
-        DEBUG_PRINTLN("✓ Metrics sent");
+        DEBUG_PRINTLN("[OK] Metrics sent");
     } else {
-        DEBUG_PRINTLN("✗ Failed to send metrics");
+        DEBUG_PRINTLN("[ERROR] Failed to send metrics");
     }
 }
 
@@ -252,7 +252,7 @@ void setup() {
     DEBUG_PRINTLN("\n\n");
     DEBUG_PRINTLN("╔══════════════════════════════════════════════╗");
     DEBUG_PRINTLN("║  ESP32 Greenhouse - VPS Client Mode          ║");
-    DEBUG_PRINTLN("║  Firmware v2.3-ota - OTA TEST SUCCESS! 🚀   ║");
+    DEBUG_PRINTLN("║  Firmware v2.3-ota - OTA Enabled             ║");
     DEBUG_PRINTLN("╚══════════════════════════════════════════════╝");
     DEBUG_PRINTLN();
     
@@ -260,12 +260,12 @@ void setup() {
     DEBUG_PRINTLN("=== Initializing Watchdog Timer ===");
     esp_task_wdt_init(WDT_TIMEOUT, true); // 30s timeout, panic on timeout
     esp_task_wdt_add(NULL); // Add current task to WDT watch
-    DEBUG_PRINTF("✓ Watchdog enabled (%d seconds)\n", WDT_TIMEOUT);
+    DEBUG_PRINTF("[OK] Watchdog enabled (%d seconds)\n", WDT_TIMEOUT);
     
     DEBUG_PRINTLN("\n=== Initializing Hardware ===");
     relays.begin();
     sensors.begin();
-    DEBUG_PRINTLN("✓ Hardware initialized");
+    DEBUG_PRINTLN("[OK] Hardware initialized");
     
     setupWiFi();
     setupNTP();
@@ -289,7 +289,7 @@ void setup() {
     DEBUG_PRINTLN();
     
     if (vpsWebSocket.isConnected()) {
-        DEBUG_PRINTLN("✓ WebSocket connected!");
+        DEBUG_PRINTLN("[OK] WebSocket connected!");
         
         vpsWebSocket.sendLog("info", "ESP32 Greenhouse started - WebSocket mode");
         
@@ -300,7 +300,7 @@ void setup() {
             DEBUG_PRINTF("Relay %d initial state: %s\n", i, state ? "ON" : "OFF");
             delay(100);
         }
-        DEBUG_PRINTLN("✓ Initial relay states sent");
+        DEBUG_PRINTLN("[OK] Initial relay states sent");
         
         delay(2000);
         sendSensorData();

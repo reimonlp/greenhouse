@@ -40,7 +40,7 @@ bool SensorManager::begin() {
     pinMode(SOIL_MOISTURE_2_PIN, INPUT);
     #endif
     
-    DEBUG_PRINTLN("✓ Sensors initialized");
+    DEBUG_PRINTLN("[OK] Sensors initialized");
     delay(2000);  // Give DHT time to stabilize
     
     return true;
