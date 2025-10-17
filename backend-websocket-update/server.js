@@ -18,7 +18,7 @@ if (!ESP32_AUTH_TOKEN || ESP32_AUTH_TOKEN.length < 32) {
     process.exit(1);
 }
 
-console.log('✅ ESP32_AUTH_TOKEN loaded from environment');
+// Silent token loading - no log noise
 
 const SensorReading = require('./models/SensorReading');
 const RelayState = require('./models/RelayState');
@@ -33,7 +33,7 @@ try {
   evaluateSensorRules = ruleEngine.evaluateSensorRules || evaluateSensorRules;
   evaluateTimeRules = ruleEngine.evaluateTimeRules || evaluateTimeRules;
 } catch (err) {
-  console.log('⚠️ [WARN] ruleEngine.js not found - rule evaluation disabled');
+  // Silent warning - rule evaluation disabled if ruleEngine.js not found
 }
 
 const app = express();
@@ -126,9 +126,12 @@ io.on('connection', (socket) => {
       return;
     }
     
+    // Silent authentication success - no log noise for routine connections
     // Log successful authentication (important event)
+    /*
     const realIP = socket.handshake.headers['x-forwarded-for']?.split(',')[0] || socket.handshake.address;
     console.log('✅ [AUTH] Device authenticated:', data.device_id, '| Firmware:', data.firmware_version, '| IP:', realIP);
+    */
     socket.deviceId = data.device_id;
     socket.deviceType = data.device_type;
     socket.authenticated = true;
@@ -305,10 +308,13 @@ io.on('connection', (socket) => {
     // Clean up rate limit data for this socket
     socketRateLimits.delete(socket.id);
     
+    // Silent disconnect for ESP32 devices - no log noise for routine disconnections
     // Only log ESP32 device disconnections (important)
+    /*
     if (socket.deviceId) {
       console.log('⚠️ [DISCONNECT] ESP32 device disconnected:', socket.deviceId);
     }
+    */
     // Silent disconnect for dashboard clients
   });
 });
@@ -368,7 +374,9 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => console.log('✓ MongoDB conectado'))
+.then(() => {
+  // Silent MongoDB connection success
+})
 .catch(err => {
   console.error('✗ Error conectando MongoDB:', err);
   process.exit(1);
@@ -379,7 +387,7 @@ setInterval(async () => {
   await evaluateTimeRules();
 }, 60000); // Cada minuto
 
-console.log('✓ Time-based rules scheduler started (checks every minute)');
+// Silent scheduler start - no log noise
 
 // ====== Health Check ======
 app.get('/health', async (req, res) => {
@@ -629,10 +637,7 @@ app.use((err, req, res, next) => {
 
 // ====== Start Server ======
 server.listen(PORT, () => {
-  console.log(`✓ Greenhouse API corriendo en puerto ${PORT}`);
-  console.log(`✓ WebSocket habilitado en /socket.io/`);
-  console.log(`✓ Modo: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`✓ Health check: http://localhost:${PORT}/health`);
+  // Silent server start - no log noise
 });
 
 // Graceful shutdown
