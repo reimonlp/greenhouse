@@ -148,6 +148,50 @@
 #define SOIL_MOISTURE_DRY_VALUE    3000
 #define SOIL_MOISTURE_WET_VALUE    1000
 
+// ========== TIMEOUTS Y DELAYS ==========
+// WiFi & Network
+#define WIFI_CONNECT_DELAY_MS           500     // Delay between WiFi connection attempts
+#define WIFI_FAILED_RESTART_DELAY_MS    5000    // Delay before restart on WiFi failure
+#define NTP_SYNC_RETRY_DELAY_MS         500     // Delay between NTP sync attempts
+
+// WebSocket Connection
+#define WS_HEARTBEAT_PING_INTERVAL_MS   15000   // WebSocket ping interval
+#define WS_HEARTBEAT_PONG_TIMEOUT_MS    3000    // WebSocket pong timeout
+#define WS_RECONNECT_INTERVAL_MS        5000    // WebSocket reconnection interval
+#define WS_PING_IDLE_THRESHOLD_MS       30000   // Send ping if no activity for 30s
+#define WS_REGISTRATION_TIMEOUT_MS      3000    // Device registration timeout
+#define WS_REGISTRATION_DELAY_MS        100     // Delay before registration
+#define WS_CONNECTION_CHECK_DELAY_MS    500     // Delay between connection checks
+#define WS_INITIAL_STATE_DELAY_MS       2000    // Delay after sending initial states
+
+// Authentication & Circuit Breaker
+#define AUTH_BACKOFF_BASE_MS            30000   // Base delay for auth retry (30s)
+#define AUTH_BACKOFF_MAX_MS             300000  // Max auth backoff delay (5 min)
+#define AUTH_BACKOFF_JITTER_PERCENT     10      // ±10% jitter for backoff
+
+// Health Checks & Monitoring
+#define HEALTH_CHECK_INTERVAL_MS        60000   // Check VPS health every 60s
+#define METRICS_SEND_INTERVAL_MS        300000  // Send metrics every 5 minutes
+#define CIRCUIT_BREAKER_TEST_MOD_MS     1000    // Circuit breaker test modulo
+
+// Sensor Reading
+#define SENSOR_READ_MIN_INTERVAL_MS     2000    // Minimum interval between sensor reads
+#define DHT_INIT_STABILIZE_DELAY_MS     2000    // DHT stabilization delay on init
+#define SOIL_MOISTURE_READ_DELAY_MS     10      // Delay between soil moisture samples
+
+// Relay Control
+#define RELAY_STATE_SEND_DELAY_MS       100     // Delay between relay state transmissions
+
+// System Startup
+#define SYSTEM_STARTUP_DELAY_MS         1000    // Delay after serial init
+#define LOOP_ITERATION_DELAY_MS         10      // Delay in main loop iteration
+
+// HTTP Status Codes
+#define HTTP_STATUS_OK                  200
+#define HTTP_STATUS_CREATED             201
+#define HTTP_STATUS_UNAUTHORIZED        401
+#define HTTP_STATUS_FORBIDDEN           403
+
 // ========== CONFIGURACIÓN DE WATCHDOG ==========
 #define WATCHDOG_TIMEOUT_SEC    120
 

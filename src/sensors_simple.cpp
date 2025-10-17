@@ -47,7 +47,7 @@ bool SensorManager::begin() {
     #endif
     
     DEBUG_PRINTLN("[OK] Sensors initialized");
-    delay(2000);  // Give DHT time to stabilize
+    delay(DHT_INIT_STABILIZE_DELAY_MS);  // Give DHT time to stabilize
     
     return true;
 }
@@ -121,8 +121,8 @@ bool SensorManager::validateHumidity(float humidity) {
 bool SensorManager::readSensors() {
     unsigned long now = millis();
     
-    // Rate limiting: read every 2 seconds minimum
-    if (now - lastReadTime < 2000) {
+    // Rate limiting: minimum interval between reads
+    if (now - lastReadTime < SENSOR_READ_MIN_INTERVAL_MS) {
         return false;
     }
     
@@ -190,7 +190,7 @@ float SensorManager::readSoilMoisture(int pin) {
     
     for (int i = 0; i < samples; i++) {
         sum += analogRead(pin);
-        delay(10);
+        delay(SOIL_MOISTURE_READ_DELAY_MS);
     }
     
     return sum / (float)samples;

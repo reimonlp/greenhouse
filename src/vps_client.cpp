@@ -80,7 +80,7 @@ int VPSClient::makeRequest(const String& endpoint, const String& method, const S
         response = https.getString();
         DEBUG_PRINTF("Response code: %d\n", httpCode);
         
-        if (httpCode == 401 || httpCode == 403) {
+        if (httpCode == HTTP_STATUS_UNAUTHORIZED || httpCode == HTTP_STATUS_FORBIDDEN) {
             DEBUG_PRINTLN("✗ Authentication failed - invalid token!");
         }
     } else {
@@ -116,7 +116,7 @@ bool VPSClient::sendSensorData(float temperature, float humidity, float soilMois
     String response;
     int code = makeRequest("/api/sensors", "POST", payload, response);
     
-    return (code == 200 || code == 201);
+    return (code == HTTP_STATUS_OK || code == HTTP_STATUS_CREATED);
 }
 
 // ========================================

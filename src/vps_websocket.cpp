@@ -43,8 +43,8 @@ bool VPSWebSocketClient::begin() {
     
     _webSocket.onEvent(webSocketEvent);
     // Disable automatic heartbeat - we'll send manual pings based on activity
-    _webSocket.enableHeartbeat(15000, 3000, 0);  // 0 = disable ping, keep pong handling
-    _webSocket.setReconnectInterval(5000);
+    _webSocket.enableHeartbeat(WS_HEARTBEAT_PING_INTERVAL_MS, WS_HEARTBEAT_PONG_TIMEOUT_MS, 0);  // 0 = disable ping, keep pong handling
+    _webSocket.setReconnectInterval(WS_RECONNECT_INTERVAL_MS);
     
     return true;
 }
@@ -56,7 +56,7 @@ void VPSWebSocketClient::loop() {
         
         if (timeSinceOpen >= CIRCUIT_BREAKER_TIMEOUT) {
             // Try one test connection after timeout
-            if (timeSinceOpen % CIRCUIT_BREAKER_TEST_INTERVAL < 1000) {
+            if (timeSinceOpen % CIRCUIT_BREAKER_TEST_INTERVAL < CIRCUIT_BREAKER_TEST_MOD_MS) {
                 LOG_INFOF("Circuit breaker: Testing connection (failure count: %d)\n", _consecutiveFailures);
                 _circuitBreakerOpen = false;
                 _consecutiveFailures = 0;  // Reset on test attempt
@@ -70,9 +70,9 @@ void VPSWebSocketClient::loop() {
     
     // Si hay fallo de autenticación, aplicar backoff exponencial con jitter
     if (_authFailed) {
-        unsigned long baseDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
+        unsigned long baseDelay = min(AUTH_BACKOFF_BASE_MS * (1 << (_authFailureCount - 1)), AUTH_BACKOFF_MAX_MS);
         // Add ±10% random jitter to prevent thundering herd
-        int jitter = (random(-10, 11) * baseDelay) / 100;
+        int jitter = (random(-AUTH_BACKOFF_JITTER_PERCENT, AUTH_BACKOFF_JITTER_PERCENT + 1) * baseDelay) / 100;
         unsigned long backoffDelay = baseDelay + jitter;
         
         if (millis() - _lastAuthAttempt < backoffDelay) {
@@ -87,11 +87,11 @@ void VPSWebSocketClient::loop() {
     _webSocket.loop();
     
     // Intelligent heartbeat: only send ping if no activity in last 30 seconds
-    if (_connected && (millis() - _lastPing > 30000)) {
+    if (_connected && (millis() - _lastPing > WS_PING_IDLE_THRESHOLD_MS)) {
         unsigned long timeSinceActivity = millis() - _lastActivity;
         
-        // Only send ping if we haven't sent/received any message in 30s
-        if (timeSinceActivity >= 30000) {
+        // Only send ping if we haven't sent/received any message recently
+        if (timeSinceActivity >= WS_PING_IDLE_THRESHOLD_MS) {
             _lastPing = millis();
             StaticJsonDocument<64> doc;
             doc["type"] = "ping";
@@ -180,7 +180,7 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
         DEBUG_PRINTLN("[OK] Connected to server");
         _webSocket.sendTXT("40");
         
-        delay(100);
+        delay(WS_REGISTRATION_DELAY_MS);
         
         unsigned long regStart = millis();
         StaticJsonDocument<256> deviceInfo;
@@ -190,8 +190,8 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
         deviceInfo["auth_token"] = DEVICE_AUTH_TOKEN;
         sendEvent("device:register", deviceInfo);
         
-        while (millis() - regStart < 3000) {
-            delay(10);
+        while (millis() - regStart < WS_REGISTRATION_TIMEOUT_MS) {
+            delay(LOOP_ITERATION_DELAY_MS);
         }
         
         DEBUG_PRINTLN("[OK] Device registered");
@@ -244,9 +244,9 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
             _metrics.authFailures++;  // Track auth failures in metrics
             
             // Calcular backoff exponencial con jitter: 30s, 60s, 120s, 240s, max 5 minutos
-            unsigned long baseDelay = min(30000UL * (1 << (_authFailureCount - 1)), 300000UL);
+            unsigned long baseDelay = min(AUTH_BACKOFF_BASE_MS * (1 << (_authFailureCount - 1)), AUTH_BACKOFF_MAX_MS);
             // Add ±10% random jitter to prevent thundering herd
-            int jitter = (random(-10, 11) * baseDelay) / 100;
+            int jitter = (random(-AUTH_BACKOFF_JITTER_PERCENT, AUTH_BACKOFF_JITTER_PERCENT + 1) * baseDelay) / 100;
             unsigned long backoffDelay = baseDelay + jitter;
             DEBUG_PRINTF("⚠ Retry after %.1f seconds (attempt %d)\n", backoffDelay / 1000.0, _authFailureCount);
             

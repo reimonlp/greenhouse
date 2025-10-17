@@ -57,7 +57,7 @@ void setupWiFi() {
     
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-        delay(500);
+        delay(WIFI_CONNECT_DELAY_MS);
         DEBUG_PRINT(".");
         attempts++;
         if (attempts % 5 == 0) {
@@ -75,7 +75,7 @@ void setupWiFi() {
     } else {
         DEBUG_PRINTLN("\n✗ WiFi connection failed!");
         DEBUG_PRINTLN("Restarting in 5 seconds...");
-        delay(5000);
+        delay(WIFI_FAILED_RESTART_DELAY_MS);
         ESP.restart();
     }
 }
@@ -88,7 +88,7 @@ void setupNTP() {
     int attempts = 0;
     while (!getLocalTime(&timeinfo) && attempts < 10) {
         DEBUG_PRINT(".");
-        delay(500);
+        delay(NTP_SYNC_RETRY_DELAY_MS);
         attempts++;
     }
     
@@ -101,7 +101,7 @@ void setupNTP() {
 }
 
 void checkVPSHealth() {
-    if (millis() - lastHealthCheck < 60000) {
+    if (millis() - lastHealthCheck < HEALTH_CHECK_INTERVAL_MS) {
         return;
     }
     lastHealthCheck = millis();
@@ -218,7 +218,7 @@ void sendSensorData() {
 
 void sendMetrics() {
     // Send metrics every 5 minutes
-    if (millis() - lastMetricsSend < 300000) {
+    if (millis() - lastMetricsSend < METRICS_SEND_INTERVAL_MS) {
         return;
     }
     lastMetricsSend = millis();
@@ -247,7 +247,7 @@ void sendMetrics() {
 
 void setup() {
     DEBUG_SERIAL_BEGIN(115200);
-    delay(1000);
+    delay(SYSTEM_STARTUP_DELAY_MS);
     
     DEBUG_PRINTLN("\n\n");
     DEBUG_PRINTLN("╔══════════════════════════════════════════════╗");
@@ -281,7 +281,7 @@ void setup() {
     int attempts = 0;
     while (!vpsWebSocket.isConnected() && attempts < 20) {
         vpsWebSocket.loop();
-        delay(500);
+        delay(WS_CONNECTION_CHECK_DELAY_MS);
         DEBUG_PRINT(".");
         esp_task_wdt_reset(); // Feed watchdog during initialization
         attempts++;
@@ -298,11 +298,11 @@ void setup() {
             bool state = relays.getRelayState(i);
             vpsWebSocket.sendRelayState(i, state, "manual", "system");
             DEBUG_PRINTF("Relay %d initial state: %s\n", i, state ? "ON" : "OFF");
-            delay(100);
+            delay(RELAY_STATE_SEND_DELAY_MS);
         }
         DEBUG_PRINTLN("[OK] Initial relay states sent");
         
-        delay(2000);
+        delay(WS_INITIAL_STATE_DELAY_MS);
         sendSensorData();
     } else {
         DEBUG_PRINTLN("⚠ WebSocket connection failed, will retry in loop");
@@ -325,6 +325,6 @@ void loop() {
     checkVPSHealth();
     sendSensorData();
     sendMetrics();
-    delay(10);
+    delay(LOOP_ITERATION_DELAY_MS);
     yield();
 }
