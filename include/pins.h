@@ -14,6 +14,6 @@
 #define SOIL_MOISTURE_2_PIN   35  // GPIO35 (input only)
 
 // Control / indicadores
-#define PAUSE_BUTTON_PIN      4   // GPIO4
 #define STATUS_LED_PIN        2   // GPIO2 (on-board)
 #define RESCUE_FORMAT_PIN     25  // GPIO25 (pull-up + jumper a GND para forzar format)
+// Note: GPIO4 available for future use

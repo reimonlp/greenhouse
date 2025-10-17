@@ -274,27 +274,3 @@ struct SystemStats {
 
 
 #endif // CONFIG_H
-// Build profile selection (defined via -D BUILD_PROFILE_MINIMAL / STANDARD / OBSERVABILITY)
-#if defined(BUILD_PROFILE_MINIMAL)
-#ifndef FEATURE_DISABLE_OTA
-#define FEATURE_DISABLE_OTA 1
-#endif
-#ifndef FEATURE_DISABLE_REMOTE_DB
-#define FEATURE_DISABLE_REMOTE_DB 1
-#endif
-#ifndef FEATURE_NO_DASHBOARD_FALLBACK
-#define FEATURE_NO_DASHBOARD_FALLBACK 1
-#endif
-#undef MIN_LOG_LEVEL
-#define MIN_LOG_LEVEL LOG_WARNING
-#endif
-
-#if defined(BUILD_PROFILE_STANDARD)
-// Standard: defaults (keep current settings)
-#endif
-
-#if defined(BUILD_PROFILE_OBSERVABILITY)
-// Observability: keep remote DB enabled, detailed debug logs optional
-#undef MIN_LOG_LEVEL
-#define MIN_LOG_LEVEL LOG_DEBUG
-#endif
