@@ -39,50 +39,27 @@ Esta actualización migra el sistema de **polling HTTP** a **WebSocket (Socket.I
 
 ---
 
-## 🚀 Pasos de Instalación
+## 🚀 Instalación Local
 
-### **Paso 1: Subir archivos al VPS**
+### **Paso 1: Instalar dependencias del backend**
 
 ```bash
-# Desde tu máquina local
 cd /home/reimon/greenhouse/backend-websocket-update
-
-# Subir server.js y configuraciones
-scp -P 5591 server.js root@reimon.dev:/tmp/
-scp -P 5591 nginx-config-websocket root@reimon.dev:/tmp/
-scp -P 5591 update-websocket.sh root@reimon.dev:/tmp/
+npm install
 ```
 
-### **Paso 2: Ejecutar actualización en el VPS**
+### **Paso 2: Ejecutar el backend**
 
 ```bash
-# Conectar al VPS
-ssh -p 5591 root@reimon.dev
-
-# Ejecutar script de actualización
-cd /tmp
-bash update-websocket.sh
+npm start
 ```
 
-El script automáticamente:
-1. Instala `socket.io` si no está instalado
-2. Crea backup del `server.js` actual
-3. Actualiza el código del backend
-4. Actualiza la configuración de Nginx
-5. Reinicia el servicio con PM2
-6. Muestra logs de verificación
-
-### **Paso 3: Deploy del Frontend**
+### **Paso 3: Instalar y ejecutar el frontend**
 
 ```bash
-# Desde tu máquina local
-cd /home/reimon/greenhouse/greenhouse-dashboard
-
-# Build con las nuevas dependencias
-npm run build
-
-# Deploy al VPS
-scp -P 5591 -r dist/* root@reimon.dev:/var/www/greenhouse/
+cd ../greenhouse-dashboard
+npm install
+npm run dev
 ```
 
 ---
@@ -146,7 +123,7 @@ tail -f /var/log/nginx/reimon.dev.access.log
 ```
 
 ### **3. Frontend**
-Abre la consola del navegador en `https://reimon.dev/greenhouse`:
+Abre la consola del navegador en `http://localhost:3001`:
 ```
 ✓ WebSocket conectado: [socket-id]
 Mensaje del servidor: {...}
@@ -170,12 +147,11 @@ Mensaje del servidor: {...}
 **Soluciones:**
 ```bash
 # 1. Verificar que el backend esté corriendo
-pm2 list
-pm2 logs greenhouse-api
+ps aux | grep node
+tail -f logs del proceso
 
-# 2. Verificar Nginx
-nginx -t
-systemctl status nginx
+# 2. Verificar que el puerto 3000 esté abierto
+netstat -tlnp | grep 3000
 
 # 3. Verificar logs de Nginx
 tail -f /var/log/nginx/reimon.dev.error.log
@@ -196,13 +172,9 @@ systemctl reload nginx
 
 ### **Error: Conexión se cae constantemente**
 
-**Causa:** Timeouts muy cortos en Nginx
+**Causa:** Timeouts en la conexión
 
-**Solución:** Verificar en `/etc/nginx/sites-available/reimon.dev`:
-```nginx
-proxy_read_timeout 86400;  # 24 horas
-proxy_send_timeout 86400;
-```
+**Solución:** Verificar que el servidor esté configurado para conexiones largas
 
 ---
 
@@ -245,7 +217,7 @@ proxy_send_timeout 86400;
 pm2 logs greenhouse-api | grep "WebSocket"
 
 # Número de clientes conectados (agregar esta métrica al health check)
-curl https://reimon.dev/greenhouse/api/health
+curl http://localhost:3000/api/health
 ```
 
 ---

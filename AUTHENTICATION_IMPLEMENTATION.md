@@ -225,52 +225,7 @@ ESP32                          Backend
   |                               |
 ```
 
-## 🚀 Próximos Pasos para Deployment
-
-### 1. Backend
-```bash
-cd /home/reimon/greenhouse/backend-websocket-update
-cp .env.example .env
-nano .env  # Configurar ESP32_AUTH_TOKEN con token seguro
-./deploy-auth.sh
-```
-
-### 2. ESP32
-```bash
-cd /home/reimon/greenhouse
-nano include/secrets.h  # Configurar mismo token
-pio run --target upload
-```
-
-### 3. Verificación
-```bash
-# Terminal 1
-pm2 logs greenhouse-backend | grep -i auth
-
-# Terminal 2
-pio device monitor
-
-# Terminal 3
-cd backend-websocket-update
-./test-auth.sh
-```
-
-## 📋 Checklist de Deployment
-
-- [ ] Generar token seguro (`openssl rand -hex 32`)
-- [ ] Configurar `.env` en backend con `ESP32_AUTH_TOKEN`
-- [ ] Configurar `secrets.h` en ESP32 con `DEVICE_AUTH_TOKEN`
-- [ ] Verificar que tokens coincidan exactamente
-- [ ] Desplegar backend: `./deploy-auth.sh`
-- [ ] Compilar y subir firmware ESP32: `pio run --target upload`
-- [ ] Verificar logs de autenticación en backend
-- [ ] Verificar conexión ESP32 en serial monitor
-- [ ] Ejecutar tests: `./test-auth.sh`
-- [ ] Verificar que relays respondan correctamente
-- [ ] Verificar que sensores envíen datos
-- [ ] Documentar token en gestor de contraseñas seguro
-
-## 🔧 Mantenimiento
+##  Mantenimiento
 
 ### Rotación de Tokens (cada 3-6 meses)
 

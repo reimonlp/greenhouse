@@ -206,7 +206,7 @@ Si encuentras problemas:
 
 3. **Probar token manualmente:**
    ```bash
-   curl -X POST https://reimon.dev/greenhouse/api/sensors \
+   curl -X POST http://localhost:3000/api/sensors \
      -H "Authorization: Bearer tu_token" \
      -H "Content-Type: application/json" \
      -d '{"temperature": 25}'

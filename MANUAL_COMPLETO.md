@@ -126,7 +126,7 @@ npm run build
    - Verificar conexión WiFi y WebSocket
 
 3. **Acceder al dashboard:**
-   - URL: `https://reimon.dev/greenhouse`
+   - URL: `http://localhost:3001`
    - Verificar sensores y controles
 
 ---
@@ -190,7 +190,7 @@ npm run build
 - Reconexión automática
 
 **WebSocket:**
-- Host: `reimon.dev`
+- Host: `localhost`
 - Puerto: 443 (SSL)
 - Path: `/greenhouse/socket.io/?EIO=4&transport=websocket`
 
@@ -218,7 +218,7 @@ npm run build
 
 ### Dashboard Web
 
-**URL:** `https://reimon.dev/greenhouse`
+**URL:** `http://localhost:3001`
 
 **Características:**
 - **Monitoreo en tiempo real** de sensores
@@ -405,7 +405,6 @@ greenhouse/
 ├── greenhouse-dashboard/
 │   ├── src/          # React frontend
 │   ├── public/
-│   └── nginx-config-reimon.dev
 └── platformio.ini    # Configuración de build
 ```
 

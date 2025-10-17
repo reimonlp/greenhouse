@@ -11,7 +11,7 @@
 
 ┌──────────────┐          ┌──────────────────────┐          ┌─────────────┐
 │   ESP32      │  WiFi    │    VPS Ubuntu 24     │  HTTP    │  Browser    │
-│  (Cliente)   │ ◄──────► │  reimon.dev          │ ◄──────► │  Dashboard  │
+│  (Cliente)   │ ◄──────► │  localhost           │ ◄──────► │  Dashboard  │
 └──────────────┘          └──────────────────────┘          └─────────────┘
    │                            │
    │ POST /api/sensors          │ ┌─────────────┐
@@ -68,7 +68,7 @@
 
 ### ✅ Estado: OPERACIONAL
 
-**Ubicación:** reimon.dev:5591 (SSH)
+**Ubicación:** localhost:22 (SSH local)
 
 **Servicios Activos:**
 - ✅ MongoDB 8.0.15 (localhost:27017)
@@ -154,16 +154,6 @@ POST /api/logs                  - Crear log
 - Expansión de metadata en JSON
 - Colores según nivel de log
 - Auto-refresh cada 10s
-
-**Archivos Listos para Deployment:**
-```
-greenhouse-dashboard/
-  ├── dist/                      ← Build de producción
-  ├── greenhouse-frontend.tar.gz ← Comprimido (250KB)
-  ├── deploy.sh                  ← Script de deployment
-  ├── vps-setup.sh              ← Script de configuración VPS
-  └── DEPLOYMENT.md             ← Guía completa
-```
 
 ---
 
@@ -257,14 +247,14 @@ http://168.181.185.42/
 3. ✅ **Comunicación Bidireccional** - ESP32 ↔ VPS testeada
 4. ✅ **Frontend Dashboard** - Todos los componentes implementados
 5. ✅ **Build de Producción** - Optimizado y listo
-6. ✅ **Scripts de Deployment** - Automatizados
+6. ✅ **Scripts de Automatización** - Listos
 7. ✅ **Documentación** - Completa con guías
 
-### 📝 Solo Falta:
+### 📝 Próximos Pasos:
 
-- 🔑 Recuperar contraseña root del VPS
-- 📤 Subir frontend al VPS (5 minutos)
-- 🌐 Acceder al dashboard en http://168.181.185.42/
+- � Configurar servidor local para testing completo
+- 🌐 Acceder al dashboard en localhost
+- 📊 Verificar funcionamiento del sistema
 
 ---
 
@@ -302,29 +292,9 @@ npm run dev
 
 # Build
 npm run build
-
-# Deploy
-./deploy.sh
 ```
 
-### VPS (cuando recuperes password):
-```bash
-# Ver logs del API
-pm2 logs greenhouse-api
-
-# Reiniciar API
-pm2 restart greenhouse-api
-
-# Ver estado nginx
-sudo systemctl status nginx
-
-# Ver logs MongoDB
-sudo journalctl -u mongod -f
-```
-
----
-
-## 🔧 Configuración del Repositorio Git
+### 🔧 Configuración del Repositorio Git
 
 ### ✅ Estado: COMPLETAMENTE SINCRONIZADO
 

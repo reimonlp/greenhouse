@@ -66,7 +66,7 @@ Authorization: Bearer tu_token_aqui
 
 **Ejemplo con curl:**
 ```bash
-curl -X POST https://reimon.dev/greenhouse/api/sensors \
+curl -X POST http://localhost:3000/api/sensors \
   -H "Authorization: Bearer esp32_gh_prod_tk_..." \
   -H "Content-Type: application/json" \
   -d '{"temperature": 25.5, "humidity": 60}'

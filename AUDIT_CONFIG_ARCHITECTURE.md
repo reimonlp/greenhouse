@@ -223,7 +223,7 @@ Total:      9  configuration issues
 ESP32 Status:           ✅ Running firmware v2.3-ota
 OTA Capability:         ✅ Enabled (correct password)
 WiFi Connection:        ✅ Connected to "FDC"
-Backend Connection:     ✅ Authenticated to reimon.dev
+Backend Connection:     ✅ Authenticated to localhost
 Sensor Data:            ✅ Transmitting (T=25.7°C H=95.0%)
 Memory Usage:           ✅ 15.7% RAM, 74.0% Flash
 Watchdog:               ✅ Active (30 seconds)
