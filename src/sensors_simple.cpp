@@ -26,6 +26,10 @@ SensorManager::SensorManager() {
     lastValidHumidity = 50.0f;  // Reasonable default
     consecutiveTempErrors = 0;
     consecutiveHumidityErrors = 0;
+    
+    // Initialize last measured values
+    lastMeasuredTemp = 20.0f;
+    lastMeasuredHumidity = 50.0f;
 }
 
 SensorManager::~SensorManager() {
@@ -132,6 +136,10 @@ bool SensorManager::readSensors() {
     float temp = dht->readTemperature();
     float hum = dht->readHumidity();
     
+    // Store last measured values (always, even if invalid)
+    lastMeasuredTemp = temp;
+    lastMeasuredHumidity = hum;
+    
     // Validate readings using new validation functions
     bool tempValid = validateTemperature(temp);
     bool humValid = validateHumidity(hum);
@@ -155,9 +163,10 @@ bool SensorManager::readSensors() {
                        consecutiveHumidityErrors);
         }
         
-        // Use last valid readings when current readings are invalid
-        currentData.temperature = lastValidTemp;
-        currentData.humidity = lastValidHumidity;
+        // Use last measured readings when current readings are invalid
+        // This shows the actual last sensor reading, even if it was invalid
+        currentData.temperature = lastMeasuredTemp;
+        currentData.humidity = lastMeasuredHumidity;
         currentData.timestamp = now;
         currentData.valid = false;
     }

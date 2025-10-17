@@ -37,6 +37,10 @@ private:
     float lastValidHumidity;
     int consecutiveTempErrors;
     int consecutiveHumidityErrors;
+    
+    // Store last measured values (valid or invalid)
+    float lastMeasuredTemp;
+    float lastMeasuredHumidity;
 
     float readSoilMoisture(int pin);
     float convertSoilMoistureToPercentage(float rawValue, int sensor);
