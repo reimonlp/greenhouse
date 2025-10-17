@@ -1,83 +1,33 @@
 version: '3.8'
 
 services:
-  # MongoDB Database
-  mongodb:
-    image: quay.io/mongodb/mongodb-community-server:7.0-ubuntu2204
-    container_name: greenhouse-mongodb
-    restart: unless-stopped
+  app:
+    build: .
+    ports:
+      - "3000:3000"  # Frontend
+      - "8080:8080"  # Backend/WebSocket
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password}
-      MONGO_INITDB_DATABASE: greenhouse
+      - MONGODB_URI=mongodb://mongodb:27017/greenhouse
+      - ESP32_AUTH_TOKEN=esp32_gh_prod_tk_9f8e7d6c5b4a3210fedcba9876543210abcdef1234567890
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+    depends_on:
+      - mongodb
     volumes:
-      - mongodb_data:/data/db
-      - ./mongodb-backend/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - ./backend-websocket-update/.env:/app/backend/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mongodb:
+    image: mongo:7
     ports:
       - "27017:27017"
-    networks:
-      - greenhouse-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  # Backend API Server
-  backend:
-    build:
-      context: ./backend-websocket-update
-      dockerfile: Dockerfile
-    container_name: greenhouse-backend
-    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - MONGODB_URI=mongodb://admin:password@mongodb:27017/greenhouse?authSource=greenhouse
-      - ESP32_AUTH_TOKEN=${ESP32_AUTH_TOKEN}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3001,http://localhost:80}
-      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
-      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-10000}
-    ports:
-      - "3000:3000"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - greenhouse-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Frontend Dashboard
-  frontend:
-    build:
-      context: ./greenhouse-dashboard
-      dockerfile: Dockerfile
-    container_name: greenhouse-frontend
-    restart: unless-stopped
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3000}
-    ports:
-      - "80:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - greenhouse-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - MONGO_INITDB_DATABASE=greenhouse
 
 volumes:
   mongodb_data:
-    driver: local
-
-networks:
-  greenhouse-network:
-    driver: bridge
