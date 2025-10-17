@@ -9,9 +9,12 @@ import {
   Paper,
   Alert,
   CircularProgress,
-  Chip
+  Chip,
+  Button,
+  Modal,
+  IconButton
 } from '@mui/material';
-import { Thermostat, Opacity, WaterDrop, WifiOff, Wifi } from '@mui/icons-material';
+import { Thermostat, Opacity, WaterDrop, WifiOff, Wifi, ShowChart } from '@mui/icons-material';
 import SensorCard from './SensorCard';
 import RelayControl from './RelayControl';
 import RuleManager from './RuleManager';
@@ -25,6 +28,7 @@ function Dashboard() {
   const [relayStates, setRelayStates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [chartModalOpen, setChartModalOpen] = useState(false);
   
   // WebSocket hooks
   const { isConnected } = useWebSocket();
@@ -169,6 +173,23 @@ function Dashboard() {
           </Grid>
         </Grid>
 
+        {/* Chart Modal Button */}
+        <Box sx={{ mb: 4, textAlign: 'center' }}>
+          <Button
+            variant="contained"
+            startIcon={<ShowChart />}
+            onClick={() => setChartModalOpen(true)}
+            sx={{ 
+              bgcolor: '#2e7d32',
+              '&:hover': { bgcolor: '#1b5e20' },
+              px: 4,
+              py: 1.5
+            }}
+          >
+            Ver Gráficos de Sensores
+          </Button>
+        </Box>
+
         {/* Relay Controls */}
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
@@ -186,9 +207,6 @@ function Dashboard() {
           </Grid>
         </Paper>
 
-        {/* Sensor Chart */}
-        <SensorChart />
-
         {/* Rule Manager */}
         <RuleManager />
 
@@ -204,6 +222,39 @@ function Dashboard() {
           </Box>
         )}
       </Container>
+
+      {/* Sensor Chart Modal */}
+      <Modal
+        open={chartModalOpen}
+        onClose={() => setChartModalOpen(false)}
+        aria-labelledby="sensor-chart-modal"
+        aria-describedby="modal-with-sensor-charts"
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '90%',
+          maxWidth: '1200px',
+          maxHeight: '90vh',
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 2,
+          overflow: 'auto'
+        }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h5" component="h2">
+              Gráficos de Sensores
+            </Typography>
+            <IconButton onClick={() => setChartModalOpen(false)}>
+              ✕
+            </IconButton>
+          </Box>
+          <SensorChart />
+        </Box>
+      </Modal>
     </Box>
   );
 }
