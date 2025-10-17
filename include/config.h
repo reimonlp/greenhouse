@@ -326,9 +326,7 @@ struct SystemStats {
 #endif
 
 // Ajustar tiempo de estabilización DHT (por defecto 2000ms en begin()):
-#ifndef DHT_STABILIZE_MS
-#define DHT_STABILIZE_MS 2000
-#endif
+// DHT_STABILIZE_MS definido arriba en línea 138
 
 
 #endif // CONFIG_H
