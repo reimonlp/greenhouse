@@ -47,7 +47,12 @@ const authenticateESP32 = (req, res, next) => {
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000,
+  trustProxy: true,
+  keyGenerator: (req) => {
+    // Use the real client IP when behind proxy
+    return req.ip || req.connection.remoteAddress;
+  }
 });
 
 function setupApiRoutes(app, ioInstance, esp32Token, evaluateSensorRulesFn) {
