@@ -142,7 +142,9 @@ io.on('connection', (socket) => {
       message: 'Authentication successful'
     });
     
+    // Silent connection - no logging for routine connections
     // Log connection without exposing sensitive data
+    /*
     const sanitizedData = {
       device_id: data.device_id,
       device_type: data.device_type,
@@ -156,6 +158,7 @@ io.on('connection', (socket) => {
       message: `ESP32 device ${data.device_id} connected via WebSocket`,
       metadata: sanitizedData
     });
+    */
   });
   
   // Sensor data from ESP32
