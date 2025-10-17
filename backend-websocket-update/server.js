@@ -8,8 +8,17 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 
-// ESP32 authentication token (use env variable in production)
-const ESP32_AUTH_TOKEN = process.env.ESP32_AUTH_TOKEN || 'esp32_gh_prod_tk_9f8e7d6c5b4a3210fedcba9876543210abcdef1234567890';
+// ESP32 authentication token - MUST be set in environment variables
+const ESP32_AUTH_TOKEN = process.env.ESP32_AUTH_TOKEN;
+
+if (!ESP32_AUTH_TOKEN || ESP32_AUTH_TOKEN.length < 32) {
+    console.error('❌ FATAL: ESP32_AUTH_TOKEN not set or too short (minimum 32 characters)');
+    console.error('   Set it in .env file or environment: ESP32_AUTH_TOKEN=your_secure_token_here');
+    console.error('   Generate a secure token: openssl rand -hex 32');
+    process.exit(1);
+}
+
+console.log('✅ ESP32_AUTH_TOKEN loaded from environment');
 
 const SensorReading = require('./models/SensorReading');
 const RelayState = require('./models/RelayState');

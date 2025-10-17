@@ -3,10 +3,11 @@
 
 #include "config.h"
 #include <DHT.h>
+#include <memory>
 
 class SensorManager {
 private:
-    DHT* dht;
+    std::unique_ptr<DHT> dht;  // Smart pointer prevents memory leaks
     unsigned long lastReadTime;
     float soilMoisture1Offset;
     float soilMoisture2Offset;

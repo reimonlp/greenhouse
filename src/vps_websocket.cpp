@@ -320,11 +320,28 @@ bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float
     data["timestamp"] = millis();
     
     // Use static buffer to avoid String object allocation
-    char payload[384];
-    strcpy(payload, "42[\"sensor:data\",");
-    size_t len = strlen(payload);
-    serializeJson(data, payload + len, sizeof(payload) - len);
-    strcat(payload, "]");
+    char payload[512];  // Increased buffer size for safety
+    size_t len = 0;
+    
+    // Safe string building with bounds checking
+    len += snprintf(payload + len, sizeof(payload) - len, "42[\"sensor:data\",");
+    
+    // Measure JSON size before serialization
+    size_t json_size = measureJson(data);
+    size_t remaining = sizeof(payload) - len - 2;  // -2 for "]" and null terminator
+    
+    if (json_size > remaining) {
+        DEBUG_PRINTLN("ERROR: JSON payload too large for buffer!");
+        return false;
+    }
+    
+    len += serializeJson(data, payload + len, remaining);
+    
+    // Safe append closing bracket
+    if (len < sizeof(payload) - 1) {
+        payload[len++] = ']';
+        payload[len] = '\0';
+    }
     
     _webSocket.sendTXT(payload);
     
@@ -346,11 +363,28 @@ bool VPSWebSocketClient::sendRelayState(int relayId, bool state, const char* mod
     data["timestamp"] = millis();
     
     // Use static buffer to avoid String object allocation
-    char payload[384];
-    strcpy(payload, "42[\"relay:state\",");
-    size_t len = strlen(payload);
-    serializeJson(data, payload + len, sizeof(payload) - len);
-    strcat(payload, "]");
+    char payload[512];  // Increased buffer size for safety
+    size_t len = 0;
+    
+    // Safe string building with bounds checking
+    len += snprintf(payload + len, sizeof(payload) - len, "42[\"relay:state\",");
+    
+    // Measure JSON size before serialization
+    size_t json_size = measureJson(data);
+    size_t remaining = sizeof(payload) - len - 2;  // -2 for "]" and null terminator
+    
+    if (json_size > remaining) {
+        DEBUG_PRINTLN("ERROR: Relay state JSON too large for buffer!");
+        return false;
+    }
+    
+    len += serializeJson(data, payload + len, remaining);
+    
+    // Safe append closing bracket
+    if (len < sizeof(payload) - 1) {
+        payload[len++] = ']';
+        payload[len] = '\0';
+    }
     
     _webSocket.sendTXT(payload);
     DEBUG_PRINTF("✓ Relay %d: %s\n", relayId, state ? "ON" : "OFF");
@@ -370,11 +404,28 @@ bool VPSWebSocketClient::sendLog(const char* level, const char* message) {
     data["timestamp"] = millis();
     
     // Use static buffer to avoid String object allocation
-    char payload[384];
-    strcpy(payload, "42[\"log\",");
-    size_t len = strlen(payload);
-    serializeJson(data, payload + len, sizeof(payload) - len);
-    strcat(payload, "]");
+    char payload[512];  // Increased buffer size for safety
+    size_t len = 0;
+    
+    // Safe string building with bounds checking
+    len += snprintf(payload + len, sizeof(payload) - len, "42[\"log\",");
+    
+    // Measure JSON size before serialization
+    size_t json_size = measureJson(data);
+    size_t remaining = sizeof(payload) - len - 2;  // -2 for "]" and null terminator
+    
+    if (json_size > remaining) {
+        // Can't log error here (would cause recursion), just fail silently
+        return false;
+    }
+    
+    len += serializeJson(data, payload + len, remaining);
+    
+    // Safe append closing bracket
+    if (len < sizeof(payload) - 1) {
+        payload[len++] = ']';
+        payload[len] = '\0';
+    }
     
     _webSocket.sendTXT(payload);
     
@@ -397,11 +448,28 @@ bool VPSWebSocketClient::sendMetrics(const ConnectionMetrics& metrics) {
     data["totalDisconnections"] = metrics.totalDisconnections;
     
     // Use static buffer to avoid String object allocation
-    char payload[512];
-    strcpy(payload, "42[\"metrics\",");
-    size_t len = strlen(payload);
-    serializeJson(data, payload + len, sizeof(payload) - len);
-    strcat(payload, "]");
+    char payload[768];  // Larger buffer for metrics (more data)
+    size_t len = 0;
+    
+    // Safe string building with bounds checking
+    len += snprintf(payload + len, sizeof(payload) - len, "42[\"metrics\",");
+    
+    // Measure JSON size before serialization
+    size_t json_size = measureJson(data);
+    size_t remaining = sizeof(payload) - len - 2;  // -2 for "]" and null terminator
+    
+    if (json_size > remaining) {
+        DEBUG_PRINTLN("ERROR: Metrics JSON too large for buffer!");
+        return false;
+    }
+    
+    len += serializeJson(data, payload + len, remaining);
+    
+    // Safe append closing bracket
+    if (len < sizeof(payload) - 1) {
+        payload[len++] = ']';
+        payload[len] = '\0';
+    }
     
     _webSocket.sendTXT(payload);
     
@@ -416,11 +484,28 @@ void VPSWebSocketClient::sendEvent(const char* event, JsonDocument& data) {
     _lastActivity = millis();
     
     // Use static buffer to avoid String object allocation
-    char payload[512];
-    snprintf(payload, sizeof(payload), "42[\"%s\",", event);
-    size_t len = strlen(payload);
-    serializeJson(data, payload + len, sizeof(payload) - len);
-    strcat(payload, "]");
+    char payload[768];  // Larger buffer for generic events
+    size_t len = 0;
+    
+    // Safe string building with bounds checking
+    len += snprintf(payload + len, sizeof(payload) - len, "42[\"%s\",", event);
+    
+    // Measure JSON size before serialization
+    size_t json_size = measureJson(data);
+    size_t remaining = sizeof(payload) - len - 2;  // -2 for "]" and null terminator
+    
+    if (json_size > remaining) {
+        DEBUG_PRINTLN("WARNING: Event JSON too large, truncating");
+        // Truncate but still send
+    }
+    
+    len += serializeJson(data, payload + len, remaining);
+    
+    // Safe append closing bracket
+    if (len < sizeof(payload) - 1) {
+        payload[len++] = ']';
+        payload[len] = '\0';
+    }
     
     _webSocket.sendTXT(payload);
 }

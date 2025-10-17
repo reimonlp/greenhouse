@@ -203,7 +203,8 @@ struct SystemStats {
 };
 
 // ========== VERSIÓN DEL FIRMWARE ==========
-#define FIRMWARE_VERSION        "1.0.0"
+// FIRMWARE_VERSION is now defined ONLY in vps_config.h to avoid conflicts
+// Do NOT define it here - vps_config.h is the single source of truth
 #define BUILD_DATE              __DATE__ " " __TIME__
 // Schema version for persisted & JSON config exports
 #ifndef CONFIG_SCHEMA_VERSION

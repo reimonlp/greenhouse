@@ -32,6 +32,7 @@
 
 // Device identification
 #define DEVICE_ID                   "ESP32_GREENHOUSE_01"
+// FIRMWARE_VERSION: Single source of truth (NOT defined in config.h)
 #define FIRMWARE_VERSION            "2.3-ota"
 
 // Security - Authentication token

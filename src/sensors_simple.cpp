@@ -8,7 +8,7 @@
 SensorManager sensors;
 
 SensorManager::SensorManager() {
-    dht = nullptr;
+    // dht is automatically initialized as nullptr by unique_ptr
     lastReadTime = 0;
     soilMoisture1Offset = 0.0;
     soilMoisture2Offset = 0.0;
@@ -23,16 +23,15 @@ SensorManager::SensorManager() {
 }
 
 SensorManager::~SensorManager() {
-    if (dht) {
-        delete dht;
-    }
+    // unique_ptr automatically deletes DHT object - no manual cleanup needed
 }
 
 bool SensorManager::begin() {
     DEBUG_PRINTLN("Initializing sensors...");
     
-    // Initialize DHT11
-    dht = new DHT(DHT_PIN, DHT11);
+    // Initialize DHT11 with smart pointer (automatic memory management)
+    // Using reset() instead of make_unique (C++11 compatible)
+    dht.reset(new DHT(DHT_PIN, DHT11));
     dht->begin();
     
     // Initialize soil moisture pins

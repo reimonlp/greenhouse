@@ -5,12 +5,31 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
+// For SSL certificate verification
+#ifdef VERIFY_SSL_CERT
+extern const uint8_t x509_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
+#endif
+
 WiFiClientSecure secureClient;
 
 VPSClient::VPSClient() {
     _lastError = "";
     _isConnected = false;
-    secureClient.setInsecure();
+    
+    // SSL Certificate Verification Configuration
+    // For production: Set VERIFY_SSL_CERT to enable certificate validation
+    #ifdef VERIFY_SSL_CERT
+        // Load root CA certificate for SSL verification
+        // This prevents MITM attacks by validating server identity
+        secureClient.setCACertBundle(x509_crt_bundle_start);  // Use built-in CA bundle
+        DEBUG_PRINTLN("✓ SSL certificate verification ENABLED");
+    #else
+        // Development mode: Skip certificate verification
+        // ⚠️ WARNING: Vulnerable to MITM attacks - DO NOT use in production!
+        secureClient.setInsecure();
+        DEBUG_PRINTLN("⚠ SSL certificate verification DISABLED (development mode)");
+        DEBUG_PRINTLN("   Enable with -DVERIFY_SSL_CERT in platformio.ini for production");
+    #endif
 }
 
 void VPSClient::begin() {

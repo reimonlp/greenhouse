@@ -49,8 +49,8 @@ void onSensorRequestReceived() {
 }
 
 void setupWiFi() {
-    DEBUG_PRINTLN("Connecting WiFi...");
-    DEBUG_PRINTLN(WIFI_SSID);
+    DEBUG_PRINTLN("Connecting to WiFi...");
+    // Don't log SSID for security (prevents network name disclosure)
     
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
