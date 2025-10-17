@@ -85,16 +85,13 @@
 #include "pins.h"
 
 // ========== CONFIGURACIÓN DE SISTEMA ==========
-#define WIFI_SSID           "FDC"
-#define WIFI_PASSWORD       "unacagada"
+// WiFi credentials are now defined ONLY in secrets.h
 #define WIFI_CONNECT_TIMEOUT_MS 15000
 #define WIFI_RETRY_BASE_MS      5000
 
 // API y seguridad
+// API_TOKEN is now defined ONLY in secrets.h
 #define API_PORT            80
-#ifndef API_TOKEN
-#define API_TOKEN           "tu_token_secreto_aqui"  // Cambiar en producción (overridden by secrets.h if defined there)
-#endif
 #define MAX_API_REQUESTS    100  // Por minuto
 
 // NTP y tiempo
