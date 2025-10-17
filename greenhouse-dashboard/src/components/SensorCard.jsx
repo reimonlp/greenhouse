@@ -6,6 +6,11 @@ function SensorCard({ title, value, unit, icon, color, errorCount = 0 }) {
   
   // Determine if value is in good range (simplified logic)
   const getStatusColor = () => {
+    // If there are sensor errors, show warning color
+    if (errorCount > 0) {
+      return '#ff9800'; // Orange warning color
+    }
+    
     if (title === 'Temperatura') {
       return value >= 15 && value <= 30 ? '#4caf50' : '#ff9800';
     } else if (title === 'Humedad') {
@@ -59,6 +64,14 @@ function SensorCard({ title, value, unit, icon, color, errorCount = 0 }) {
               color="error" 
               size="small"
               sx={{ fontWeight: 'bold' }}
+            />
+          ) : errorCount > 0 ? (
+            <Chip 
+              icon={<Warning />} 
+              label={`${errorCount} error${errorCount > 1 ? 'es' : ''} detectado${errorCount > 1 ? 's' : ''}`} 
+              color="warning" 
+              size="small"
+              variant="outlined"
             />
           ) : value > 0 ? (
             <>
