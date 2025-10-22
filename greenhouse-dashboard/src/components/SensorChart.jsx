@@ -24,10 +24,10 @@ import {
 import { getSensorReadings } from '../services/api';
 
 const TIME_RANGES = {
-  '1h': { label: '1 Hora', limit: 60 },
-  '6h': { label: '6 Horas', limit: 360 },
-  '24h': { label: '24 Horas', limit: 1440 },
-  '7d': { label: '7 Días', limit: 10080 }
+  '1h': { label: '1 Hora', ms: 60 * 60 * 1000 },
+  '6h': { label: '6 Horas', ms: 6 * 60 * 60 * 1000 },
+  '24h': { label: '24 Horas', ms: 24 * 60 * 60 * 1000 },
+  '7d': { label: '7 Días', ms: 7 * 24 * 60 * 60 * 1000 }
 };
 
 function SensorChart() {
@@ -39,16 +39,21 @@ function SensorChart() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const range = TIME_RANGES[timeRange];
-      const response = await getSensorReadings(range.limit);
-      
+      // Pedir más lecturas para asegurar cobertura del rango
+      const response = await getSensorReadings(2000);
       if (response.success && response.data) {
-        // Transform data for recharts
-        const transformedData = response.data
-          .reverse() // Most recent last for charts
+        const now = Date.now();
+        const rangeMs = TIME_RANGES[timeRange].ms;
+        // Filtrar por timestamp
+        const filtered = response.data.filter(reading => {
+          const ts = new Date(reading.timestamp).getTime();
+          return now - ts <= rangeMs;
+        });
+        const transformedData = filtered
+          .reverse()
           .map(reading => ({
-            timestamp: new Date(reading.timestamp).toLocaleTimeString('es-AR', { 
-              hour: '2-digit', 
+            timestamp: new Date(reading.timestamp).toLocaleTimeString('es-AR', {
+              hour: '2-digit',
               minute: '2-digit',
               hour12: false,
               ...(timeRange === '7d' && { day: '2-digit', month: '2-digit' })
@@ -58,7 +63,6 @@ function SensorChart() {
             humidity: reading.humidity,
             soil_moisture: reading.soil_moisture
           }));
-        
         setData(transformedData);
       }
       setLoading(false);
