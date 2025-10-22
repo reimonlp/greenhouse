@@ -1,4 +1,3 @@
-
 # Copilot Instructions for Greenhouse Project
 
 
@@ -6,7 +5,7 @@
  **Firmware (ESP32, PlatformIO):** Todo el código, configuración y utilidades están en `esp32-firmware/` (incluye `src/`, `include/`, `.pio/`, `scripts/`, `platformio.ini`, `partitions.csv`, `ota-upload.sh`). Controla sensores/relays, WiFi, OTA y comunica con el backend por HTTP/WebSocket. Configuración sensible en `esp32-firmware/include/secrets.h`.
 - **Backend (Node.js, Socket.IO):** En `backend-websocket-update/`, gestiona API REST y WebSocket, autenticación, logs, reglas y estados. Configuración en `.env`.
  Pines y sensores definidos en `esp32-firmware/include/sensors.h` y `esp32-firmware/include/relays.h`.
-- **Nginx:** Proxy reverso para `/greenhouse/socket.io/` y dashboard web.
+- **Nginx/Docker:** Todos los archivos de despliegue y configuración Docker (Dockerfile, docker-compose.yml, nginx.conf, start.sh) están en la carpeta `docker/`.
  **Firmware:** Compila y sube con `pio run --target upload` o `ota-upload.sh` desde `esp32-firmware/`. Edita credenciales en `esp32-firmware/include/secrets.h`.
 ## Hardware y Configuración
  Usa el monitor serial y logs para depurar errores de firmware (ejecuta comandos desde `esp32-firmware/`).
@@ -30,7 +29,7 @@
 ## Comunicación y Eventos
 - **WebSocket:** Backend (`server.js`) y frontend (`src/services/websocket.js`, `src/hooks/useWebSocket.js`) gestionan eventos como `sensor:new`, `relay:changed`, `rule:created`, `log:new`.
 - **API REST:** Endpoints en `routes/api.js`, modelos en `models/` (`SensorReading.js`, `RelayState.js`).
-- **Nginx:** Proxy para `/greenhouse/socket.io/` y dashboard web (`nginx.conf`).
+- **Nginx/Docker:** Proxy para `/greenhouse/socket.io/` y dashboard web (`docker/nginx.conf`). Archivos de despliegue en `docker/`.
 
 ## Validaciones y Automatización
 - Validación automática de sensores (rangos, errores consecutivos, anomalías).
