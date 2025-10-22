@@ -3,13 +3,13 @@
 
 
 ## Arquitectura General
-- **Firmware (ESP32, PlatformIO):** En `src/` y `include/`, controla sensores/relays, WiFi, OTA y comunica con el backend por HTTP/WebSocket. Configuración sensible en `include/secrets.h`.
+ **Firmware (ESP32, PlatformIO):** Todo el código, configuración y utilidades están en `esp32-firmware/` (incluye `src/`, `include/`, `.pio/`, `scripts/`, `platformio.ini`, `partitions.csv`, `ota-upload.sh`). Controla sensores/relays, WiFi, OTA y comunica con el backend por HTTP/WebSocket. Configuración sensible en `esp32-firmware/include/secrets.h`.
 - **Backend (Node.js, Socket.IO):** En `backend-websocket-update/`, gestiona API REST y WebSocket, autenticación, logs, reglas y estados. Configuración en `.env`.
-- **Frontend (React, Vite):** En `greenhouse-dashboard/`, muestra datos en tiempo real, control manual/automático de relays, logs y reglas. Usa WebSocket y actualizaciones automáticas.
+ Pines y sensores definidos en `esp32-firmware/include/sensors.h` y `esp32-firmware/include/relays.h`.
 - **Nginx:** Proxy reverso para `/greenhouse/socket.io/` y dashboard web.
-
+ **Firmware:** Compila y sube con `pio run --target upload` o `ota-upload.sh` desde `esp32-firmware/`. Edita credenciales en `esp32-firmware/include/secrets.h`.
 ## Hardware y Configuración
-- ESP32 NodeMCU-32S, DHT11, 2x sensores de humedad de suelo, módulo de 4 relays.
+ Usa el monitor serial y logs para depurar errores de firmware (ejecuta comandos desde `esp32-firmware/`).
 - Pines y sensores definidos en `include/sensors.h` y `include/relays.h`.
 - WiFi 2.4GHz, OTA por puerto 3232, hostname `ESP32_GREENHOUSE_01.local`.
 
