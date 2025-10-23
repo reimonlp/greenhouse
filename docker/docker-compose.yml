@@ -1,33 +1,78 @@
-version: '3.8'
+version: '3.9'
+
+# DESARROLLO LOCAL - docker-compose.yml
+# Para producción: docker-compose.prod.yml
 
 services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"  # Frontend
-      - "8080:8080"  # Backend/WebSocket
-    environment:
-      - MONGODB_URI=mongodb://mongodb:27017/greenhouse
-      - ESP32_AUTH_TOKEN=esp32_gh_prod_tk_9f8e7d6c5b4a3210fedcba9876543210abcdef1234567890
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
-    depends_on:
-      - mongodb
-    volumes:
-      - ./backend-websocket-update/.env:/app/backend/.env
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
+  # MongoDB Database
   mongodb:
-    image: mongo:7
+    image: mongo:4.4  # Compatible con CPUs sin AVX (netbooks antiguas)
+    container_name: greenhouse-mongodb
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
     environment:
       - MONGO_INITDB_DATABASE=greenhouse
+    healthcheck:
+      test: mongo --eval "db.adminCommand('ping')" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - greenhouse-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Main Application (Frontend + Backend + Nginx)
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: greenhouse-app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    ports:
+      - "3000:3000"    # Nginx (Frontend)
+      - "8080:8080"    # Backend API/WebSocket
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/greenhouse
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=10000
+      - ESP32_AUTH_TOKEN=dev_token_minimum_32_characters_required_please_change_me_asap
+      - LOG_LEVEL=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - greenhouse-network
+    labels:
+      - "com.greenhouse.description=Greenhouse App (Dev)"
+      - "com.greenhouse.version=1.0"
+      - "com.greenhouse.environment=development"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   mongodb_data:
+    driver: local
+
+networks:
+  greenhouse-network:
+    driver: bridge
