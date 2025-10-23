@@ -46,14 +46,13 @@ services:
         condition: service_healthy
     
     # Solo exponer a localhost (Nginx hace el proxy)
-    # Mapeamos el puerto 3000 del contenedor al 3001 del host para evitar conflictos.
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:3000:3000"
     
     env_file:
       - /opt/greenhouse/.env.production
     environment:
-      - PORT=8080
+      - PORT=3000
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongodb:27017/greenhouse
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://reimon.dev}

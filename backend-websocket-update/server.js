@@ -44,6 +44,33 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ====== Static Frontend Files ======
+// Serve static files from the frontend build directory
+const path = require('path');
+const frontendPath = path.join(__dirname, '../frontend/dist');
+
+// Serve static files (CSS, JS, images, etc.)
+app.use('/assets', express.static(path.join(frontendPath, 'assets')));
+app.use('/favicon.svg', express.static(path.join(frontendPath, 'favicon.svg')));
+
+// Serve the main React app for all non-API routes
+app.get('*', (req, res, next) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) {
+    return next();
+  }
+  
+  // Serve index.html for all other routes (React Router)
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+// ====== Middleware ======
+app.use(helmet());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*'
+}));
+app.use(express.json());
+
 // ====== Crear servidor HTTP ======
 const server = http.createServer(app);
 
@@ -56,13 +83,6 @@ const io = new Server(server, {
   },
   path: '/socket.io/'
 });
-
-// ====== Middleware ======
-app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*'
-}));
-app.use(express.json());
 
 // Custom morgan format to log real IP addresses
 morgan.token('real-ip', (req) => {

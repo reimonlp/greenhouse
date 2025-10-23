@@ -19,21 +19,18 @@ RUN npm run build
 # Verify build
 RUN ls -la dist/ && echo "✅ Frontend build successful"
 
-# Stage 2: Setup Backend and Nginx
+# Stage 2: Setup Backend (Express serves frontend)
 FROM node:20-alpine
 
-# Install nginx, curl and other utilities
+# Install curl and other utilities
 RUN apk add --no-cache \
-    nginx \
     curl \
     bash \
     jq \
     && rm -rf /var/cache/apk/*
 
-# Create nginx user and directories with proper permissions
-RUN adduser -D -g 'www' www && \
-    mkdir -p /www /run/nginx /var/log/nginx /app/backend/logs && \
-    chown -R www:www /www /run/nginx /var/log/nginx
+# Create directories
+RUN mkdir -p /app/backend/logs
 
 # Setup backend
 WORKDIR /app/backend
@@ -48,40 +45,27 @@ RUN npm ci --prefer-offline --no-audit --omit=dev
 COPY backend-websocket-update/ ./
 
 # Copy built frontend from previous stage
-COPY --from=frontend-builder /app/frontend/dist /www
-
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Create health check script
 RUN echo '#!/bin/sh' > /healthcheck.sh && \
     echo 'curl -sf http://localhost:3000/health > /dev/null 2>&1 || exit 1' >> /healthcheck.sh && \
     chmod +x /healthcheck.sh
 
-# Expose ports
-EXPOSE 3000 8080
+# Expose port (Express serves both frontend and API)
+EXPOSE 3000
 
-# Health check - verify both Nginx and Backend are responding
+# Health check - verify Express server is responding
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD /healthcheck.sh
 
-# Copy start script
-COPY docker/start.sh /start.sh
-RUN chmod +x /start.sh
-
 # Set labels for debugging
 LABEL maintainer="Reimon <info@reimon.dev>"
-LABEL description="Greenhouse Monitoring System - Frontend + Backend + Nginx"
+LABEL description="Greenhouse Monitoring System - Express serves Frontend + API"
 LABEL version="1.0"
-
-# Switch to non-root user for security
-USER www
-
-# Healthcheck as www user won't work, need to keep root or use healthcheck script
-USER root
 
 # Graceful shutdown handling
 STOPSIGNAL SIGTERM
 
-# Start both nginx and backend
-CMD ["/start.sh"]
+# Start Express server (serves both frontend and API)
+CMD ["npm", "start"]
