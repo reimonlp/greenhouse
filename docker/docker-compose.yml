@@ -29,7 +29,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Main Application (Frontend + Backend + Nginx)
+  # Main Application (Express serves Frontend + Backend)
   app:
     build:
       context: ..
@@ -39,10 +39,9 @@ services:
       mongodb:
         condition: service_healthy
     ports:
-      - "3000:3000"    # Nginx (Frontend)
-      - "8080:8080"    # Backend API/WebSocket
+      - "3000:3000"    # Express (Frontend + API)
     environment:
-      - PORT=8080
+      - PORT=3000
       - NODE_ENV=development
       - MONGODB_URI=mongodb://mongodb:27017/greenhouse
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
