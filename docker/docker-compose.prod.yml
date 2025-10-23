@@ -1,0 +1,96 @@
+version: '3.9'
+
+# PRODUCCIÓN - USAR EN VPS
+# Lee .env.production para credenciales sensibles
+# No expone puertos al exterior (solo localhost para Nginx proxy)
+
+services:
+  mongodb:
+    image: mongo:7-alpine
+    container_name: greenhouse-mongodb
+    # NO exponer puerto publicamente
+    volumes:
+      - mongodb_data:/data/db
+      - ./backups/mongo:/backups
+    environment:
+      - MONGO_INITDB_DATABASE=greenhouse
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+    networks:
+      - greenhouse-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    labels:
+      - "com.greenhouse.service=mongodb"
+      - "com.greenhouse.environment=production"
+
+  app:
+    # Opción 1: Usar imagen pusheada a DockerHub
+    image: ${DOCKER_IMAGE:-local/greenhouse:latest}
+    # Opción 2: Build local si está disponible
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
+    
+    container_name: greenhouse-app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    
+    # Solo exponer a localhost (Nginx hace el proxy)
+    # Mapeamos el puerto 3000 del contenedor al 3001 del host para evitar conflictos.
+    ports:
+      - "127.0.0.1:3001:3000"
+    
+    environment:
+      - PORT=8080
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/greenhouse
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://reimon.dev}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-5000}
+      - ESP32_AUTH_TOKEN=${ESP32_AUTH_TOKEN}
+      - LOG_LEVEL=info
+    
+    # Montar directorio de logs para facilitar backup
+    volumes:
+      - ./logs/app:/app/backend/logs
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    
+    # Auto-restart en caso de fallo
+    restart: always
+    
+    networks:
+      - greenhouse-network
+    
+    labels:
+      - "com.greenhouse.service=app"
+      - "com.greenhouse.environment=production"
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  greenhouse-network:
+    driver: bridge
