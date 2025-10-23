@@ -50,6 +50,8 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     
+    env_file:
+      - /opt/greenhouse/.env.production
     environment:
       - PORT=8080
       - NODE_ENV=production
@@ -57,7 +59,6 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://reimon.dev}
       - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-5000}
-      - ESP32_AUTH_TOKEN=${ESP32_AUTH_TOKEN}
       - LOG_LEVEL=info
     
     # Montar directorio de logs para facilitar backup
