@@ -3,14 +3,14 @@
 #pragma once
 
 // WiFi
-#define WIFI_SSID        "TuSSID"
-#define WIFI_PASSWORD    "TuPasswordWiFi"
+#define WIFI_SSID        "FDC"
+#define WIFI_PASSWORD    "unacagada"
 
 // API token (>=24 chars aleatorios recomendados)
-#define API_TOKEN        "token_super_secreto"
+#define API_TOKEN        "GHAPI_2f8c1e7a4b9d4e6f8c2a7e1b3c4d5f6a"
 
 // Device authentication for VPS/WebSocket (change in production!)
-#define DEVICE_AUTH_TOKEN "esp32_greenhouse_secure_token_2024_change_this"
+#define DEVICE_AUTH_TOKEN "GHDEV_7e4b2c9a1f6d3e8b5c2a9f7e1d4c6b8a"
 
 // MongoDB Atlas URI (SRV)
 #define MONGODB_URI      "mongodb+srv://usuario:password@cluster0.zomntcg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
@@ -25,4 +25,4 @@
 #define MONGODB_COLL_STATS     "statistics"
 
 // OTA
-#define OTA_PASSWORD     "ota_password_123"
+#define OTA_PASSWORD     "GHOTA_!vP9rT7sQ2wL6zB8"
