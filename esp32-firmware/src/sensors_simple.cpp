@@ -11,7 +11,6 @@ SensorManager::SensorManager() {
     // dht is automatically initialized as nullptr by unique_ptr
     lastReadTime = 0;
     soilMoisture1Offset = 0.0;
-    soilMoisture2Offset = 0.0;
     readingIndex = 0;
     bufferFull = false;
     lastDhtValid = false;
@@ -46,9 +45,6 @@ bool SensorManager::begin() {
     
     // Initialize soil moisture pins
     pinMode(SOIL_MOISTURE_1_PIN, INPUT);
-    #ifdef SOIL_MOISTURE_2_PIN
-    pinMode(SOIL_MOISTURE_2_PIN, INPUT);
-    #endif
     
     DEBUG_PRINTLN("[OK] Sensors initialized");
     delay(DHT_INIT_STABILIZE_DELAY_MS);  // Give DHT time to stabilize
@@ -173,14 +169,7 @@ bool SensorManager::readSensors() {
     
     // Read soil moisture (simplified)
     float soil1 = readSoilMoisture(SOIL_MOISTURE_1_PIN);
-    currentData.soil_moisture_1 = convertSoilMoistureToPercentage(soil1, 0);
-    
-    #ifdef SOIL_MOISTURE_2_PIN
-    float soil2 = readSoilMoisture(SOIL_MOISTURE_2_PIN);
-    currentData.soil_moisture_2 = convertSoilMoistureToPercentage(soil2, 1);
-    #else
-    currentData.soil_moisture_2 = 0;
-    #endif
+    currentData.soil_moisture_1 = convertSoilMoistureToPercentage(soil1);
     
     lastSoilComplete = true;
     
@@ -209,25 +198,15 @@ float SensorManager::readSoilMoisture(int pin) {
     return sum / (float)samples;
 }
 
-float SensorManager::convertSoilMoistureToPercentage(float rawValue, int sensor) {
+float SensorManager::convertSoilMoistureToPercentage(float rawValue) {
     // Simplified calibration
     // Assuming: 4095 = dry (0%), 1500 = wet (100%)
     const float DRY_VALUE = 4095.0;
     const float WET_VALUE = 1500.0;
-    
     float percentage = 100.0 * (DRY_VALUE - rawValue) / (DRY_VALUE - WET_VALUE);
-    
-    // Apply offset if set
-    if (sensor == 0) {
-        percentage += soilMoisture1Offset;
-    } else if (sensor == 1) {
-        percentage += soilMoisture2Offset;
-    }
-    
-    // Clamp to 0-100%
+    percentage += soilMoisture1Offset;
     if (percentage < 0) percentage = 0;
     if (percentage > 100) percentage = 100;
-    
     return percentage;
 }
 
@@ -239,12 +218,8 @@ SensorData SensorManager::getLastValidData() {
     return lastValidData;
 }
 
-void SensorManager::setSoilMoistureOffset(int sensor, float offset) {
-    if (sensor == 0) {
-        soilMoisture1Offset = offset;
-    } else if (sensor == 1) {
-        soilMoisture2Offset = offset;
-    }
+void SensorManager::setSoilMoistureOffset(float offset) {
+    soilMoisture1Offset = offset;
 }
 
 bool SensorManager::isDataValid(const SensorData& data) {

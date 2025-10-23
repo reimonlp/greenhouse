@@ -11,7 +11,6 @@
 #define DHT_PIN               23  // GPIO23 → DHT11 sensor
 // External temperature sensor pins removed (NTC/DS18B20 not used)
 #define SOIL_MOISTURE_1_PIN   34  // GPIO34 (input only)
-#define SOIL_MOISTURE_2_PIN   35  // GPIO35 (input only)
 
 // Control / indicadores
 #define STATUS_LED_PIN        2   // GPIO2 (on-board)

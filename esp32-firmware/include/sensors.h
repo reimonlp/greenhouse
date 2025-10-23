@@ -24,7 +24,6 @@ private:
     std::unique_ptr<DHT> dht;  // Smart pointer prevents memory leaks
     unsigned long lastReadTime;
     float soilMoisture1Offset;
-    float soilMoisture2Offset;
     int readingIndex;
     bool bufferFull;
     bool lastDhtValid;
@@ -43,63 +42,22 @@ private:
     float lastMeasuredHumidity;
 
     float readSoilMoisture(int pin);
-    float convertSoilMoistureToPercentage(float rawValue, int sensor);
+    float convertSoilMoistureToPercentage(float rawValue);
     bool validateTemperature(float temp);
     bool validateHumidity(float humidity);
 
 public:
     SensorManager();
     ~SensorManager();
-    
-    /**
-     * @brief Initialize all sensors and calibration data
-     * @return true if all sensors initialized successfully
-     */
     bool begin();
-    
-    /**
-     * @brief Read all sensors and perform validation
-     * @return true if at least one sensor reading was successful
-     */
     bool readSensors();
-    
-    /**
-     * @brief Get most recent sensor readings (may include invalid data)
-     * @return SensorData struct with current readings
-     */
     SensorData getCurrentData();
-    
-    /**
-     * @brief Get last known valid sensor readings
-     * @return SensorData struct with validated readings
-     */
     SensorData getLastValidData();
-    
-    /**
-     * @brief Calibrate soil moisture sensor offset
-     * @param sensor Sensor number (1 or 2)
-     * @param offset Calibration offset value
-     */
-    void setSoilMoistureOffset(int sensor, float offset);
-    
-    /**
-     * @brief Check if sensor data passes all validation criteria
-     * @param data SensorData to validate
-     * @return true if data is valid and trustworthy
-     */
+    void setSoilMoistureOffset(float offset);
     bool isDataValid(const SensorData& data);
-    
-    /**
-     * @brief Get descriptive error message for last operation
-     * @return String containing error description
-     */
     String getLastError();
-    
-    // Sensor health monitoring
     int getTempErrors() const { return consecutiveTempErrors; }
     int getHumidityErrors() const { return consecutiveHumidityErrors; }
-    
-    // Simplified stubs for compatibility
     bool updateSoilSampling();
     SystemStats getStatistics();
     void resetStatistics();
