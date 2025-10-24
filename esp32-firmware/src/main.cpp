@@ -238,7 +238,7 @@ void sendSensorData() {
         return;
     }
     
-    bool success = vpsWebSocket.sendSensorData(temp, hum, -1, tempErrors, humErrors);
+    bool success = vpsWebSocket.sendSensorData(temp, hum, data.soil_moisture, tempErrors, humErrors);
     
     if (!success) {
         failedRequests++;

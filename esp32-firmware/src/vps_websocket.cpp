@@ -1,3 +1,16 @@
+        } else if (strcmp(eventName, "sensor:storm") == 0 && doc.size() >= 2) {
+            JsonObject data = doc[1];
+            float ciudadHumidity = data["ciudad_humidity"] | -1;
+            const char* ciudad = data["ciudad"] | "";
+            const char* apiError = data["api_error"] | "";
+            DEBUG_PRINTLN("[AVISO] Tormenta detectada por backend!");
+            DEBUG_PRINTF("Humedad ciudad (%s): %.1f%%\n", ciudad, ciudadHumidity);
+            if (apiError && strlen(apiError) > 0) {
+                DEBUG_PRINTF("Error API meteorológica: %s\n", apiError);
+            }
+            // Parche: Usar humedad de la ciudad como humedad indoor
+            extern SensorManager sensors;
+            sensors.overrideHumidity(ciudadHumidity);
 #include "vps_websocket.h"
 #include "config.h"
 

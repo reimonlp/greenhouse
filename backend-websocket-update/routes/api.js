@@ -69,9 +69,40 @@ function setupApiRoutes(app, ioInstance, esp32Token, evaluateSensorRulesFn) {
       const reading = new SensorReading(req.body);
       await reading.save();
 
-      // Emitir evento WebSocket con nueva lectura
-      io.emit('sensor:new', reading);
+      // Si llega external_humidity, usar ese valor para reglas y eventos
+      const humidityToUse = (typeof reading.external_humidity === 'number' && reading.external_humidity >= 0)
+        ? reading.external_humidity
+        : reading.humidity;
 
+      if (humidityToUse >= 95) {
+        // Consulta a Open-Meteo (sin API key, gratuita)
+        const fetch = require('node-fetch');
+        const LAT_LA_PLATA = -34.9214;
+        const LON_LA_PLATA = -57.9544;
+        let ciudadHumidity = null;
+        let apiError = null;
+        try {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT_LA_PLATA}&longitude=${LON_LA_PLATA}&current_weather=true`;
+          const response = await fetch(url);
+          const data = await response.json();
+          ciudadHumidity = data?.current_weather?.relative_humidity ?? null;
+        } catch (err) {
+          apiError = err.message;
+        }
+        io.emit('sensor:storm', {
+          message: 'Situación de tormenta detectada',
+          sensor_humidity: humidityToUse,
+          ciudad: 'La Plata',
+          ciudad_humidity: ciudadHumidity,
+          api_error: apiError
+        });
+      } else {
+        // Emitir evento WebSocket con nueva lectura normal
+        io.emit('sensor:new', reading);
+      }
+
+      // Pasar el valor correcto a las reglas
+      reading.humidity = humidityToUse;
       await evaluateSensorRules(reading);
 
       res.status(201).json({ success: true, data: reading });
