@@ -6,7 +6,7 @@ version: '3.9'
 
 services:
   mongodb:
-    image: mongo:7-alpine
+    image: mongodb/mongodb-community-server:7.0-ubi8
     container_name: greenhouse-mongodb
     # NO exponer puerto publicamente (solo acceso interno)
     volumes:
@@ -34,11 +34,11 @@ services:
 
   app:
     # Opción 1: Usar imagen pusheada a DockerHub
-    image: ${DOCKER_IMAGE:-local/greenhouse:latest}
+#    image: ${DOCKER_IMAGE:-local/greenhouse:latest}
     # Opción 2: Build local si está disponible
-    # build:
-    #   context: ..
-    #   dockerfile: docker/Dockerfile
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     
     container_name: greenhouse-app
     depends_on:
@@ -50,7 +50,7 @@ services:
       - "127.0.0.1:3000:3000"
     
     env_file:
-      - /opt/greenhouse/.env.production
+      - .env.production
     environment:
       - PORT=3000
       - NODE_ENV=production
