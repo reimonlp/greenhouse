@@ -218,7 +218,7 @@ void setupOTA() {
  * Critical for real-time greenhouse monitoring and automation.
  */
 void sendSensorData() {
-    if (millis() - lastSensorSend < SENSOR_SEND_INTERVAL_MS) {
+    if (millis() - lastSensorSend < SENSOR_READ_INTERVAL_MS) {
         return;
     }
     lastSensorSend = millis();

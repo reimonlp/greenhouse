@@ -30,6 +30,7 @@ public:
 private:
     String _lastError;
     bool _isConnected;
+    int makeRequest(const String& endpoint, const String& method, const String& payload, String& response);
     
 };
 

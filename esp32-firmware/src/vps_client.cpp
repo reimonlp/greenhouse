@@ -40,7 +40,11 @@ void VPSClient::begin() {
 int VPSClient::makeRequest(const String& endpoint, const String& method, const String& payload, String& response) {
     if (!_isConnected) {
         DEBUG_PRINTLN("VPSClient not connected");
-    _lastError = error;
+        _lastError = "_not_connected";
+        return -1;
+    }
+    // TODO: Implement HTTP request logic here
+    return 0;
 }
 
 // Envío de datos por WebSocket únicamente. Función HTTP deshabilitada.
