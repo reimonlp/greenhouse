@@ -1,6 +1,3 @@
-    float externalHumidity = -1;
-    void setExternalHumidity(float value);
-    void clearExternalHumidity();
 #ifndef SENSORS_H
 #define SENSORS_H
 
@@ -24,6 +21,10 @@
  */
 class SensorManager {
 private:
+    float externalHumidity;
+public:
+    void setExternalHumidity(float value);
+    void clearExternalHumidity();
     std::unique_ptr<DHT> dht;  // Smart pointer prevents memory leaks
     unsigned long lastReadTime;
     float soilMoisture1Offset;
