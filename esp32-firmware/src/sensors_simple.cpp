@@ -1,3 +1,6 @@
+// Permite guardar humedad externa especial (ej: tormenta)
+// Implementación debe ir después de la declaración de la clase
+
 // Simplified SensorManager for VPS client mode
 // Basic DHT22 reading without complex state management
 
@@ -7,6 +10,16 @@
 // Global instance
 SensorManager sensors;
 
+// Set external humidity value (e.g., from API)
+void SensorManager::setExternalHumidity(float value) {
+    externalHumidity = value;
+}
+
+// Clear external humidity (reset to -1)
+void SensorManager::clearExternalHumidity() {
+    externalHumidity = -1.0f;
+}
+
 SensorManager::SensorManager() {
     // dht is automatically initialized as nullptr by unique_ptr
     lastReadTime = 0;
@@ -15,17 +28,15 @@ SensorManager::SensorManager() {
     bufferFull = false;
     lastDhtValid = false;
     lastSoilComplete = false;
-    
+    externalHumidity = -1.0f;
     // Initialize data
     currentData = {0.0, 0.0, 0.0, 0, false};
     lastValidData = currentData;
-    
     // Initialize validation tracking
     lastValidTemp = 20.0f;  // Reasonable default
     lastValidHumidity = 50.0f;  // Reasonable default
     consecutiveTempErrors = 0;
     consecutiveHumidityErrors = 0;
-    
     // Initialize last measured values
     lastMeasuredTemp = 20.0f;
     lastMeasuredHumidity = 50.0f;
