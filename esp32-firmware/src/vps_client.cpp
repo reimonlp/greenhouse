@@ -40,84 +40,10 @@ void VPSClient::begin() {
 int VPSClient::makeRequest(const String& endpoint, const String& method, const String& payload, String& response) {
     if (!_isConnected) {
         DEBUG_PRINTLN("VPSClient not connected");
-        return -1;
-    }
-    
-    HTTPClient https;
-    
-    // Use char buffer to avoid String concatenation
-    char url[256];
-    snprintf(url, sizeof(url), "%s%s", VPS_API_BASE_URL, endpoint.c_str());
-    DEBUG_PRINTF("Request: %s %s\n", method.c_str(), url);
-    
-    if (!https.begin(secureClient, url)) {
-        DEBUG_PRINTLN("HTTPS begin failed");
-        return -1;
-    }
-    
-    https.addHeader("Content-Type", "application/json");
-    
-    // Use char buffer for auth header
-    char authHeader[256];
-    snprintf(authHeader, sizeof(authHeader), "Bearer %s", DEVICE_AUTH_TOKEN);
-    https.addHeader("Authorization", authHeader);
-    https.setTimeout(10000);
-    
-    int httpCode;
-    if (method == "POST") {
-        httpCode = https.POST(payload);
-    } else if (method == "GET") {
-        httpCode = https.GET();
-    } else if (method == "PUT") {
-        httpCode = https.PUT(payload);
-    } else if (method == "DELETE") {
-        httpCode = https.sendRequest("DELETE", payload);
-    } else {
-        httpCode = -1;
-    }
-    
-    if (httpCode > 0) {
-        response = https.getString();
-        DEBUG_PRINTF("Response code: %d\n", httpCode);
-        
-        if (httpCode == HTTP_STATUS_UNAUTHORIZED || httpCode == HTTP_STATUS_FORBIDDEN) {
-            DEBUG_PRINTLN("✗ Authentication failed - invalid token!");
-        }
-    } else {
-        DEBUG_PRINTF("Request failed: %s\n", https.errorToString(httpCode).c_str());
-    }
-    
-    https.end();
-    
-    return httpCode;
-}
-
-String VPSClient::buildUrl(const char* endpoint) {
-    return String(VPS_API_BASE_URL) + String(endpoint);
-}
-
-void VPSClient::setLastError(const String& error) {
     _lastError = error;
 }
 
-bool VPSClient::sendSensorData(float temperature, float humidity, float soilMoisture) {
-    StaticJsonDocument<256> doc;
-    doc["device_id"] = DEVICE_ID;
-    doc["temperature"] = temperature;
-    doc["humidity"] = humidity;
-    
-    if (soilMoisture >= 0) {
-        doc["soil_moisture"] = soilMoisture;
-    }
-    
-    String payload;
-    serializeJson(doc, payload);
-    
-    String response;
-    int code = makeRequest("/api/sensors", "POST", payload, response);
-    
-    return (code == HTTP_STATUS_OK || code == HTTP_STATUS_CREATED);
-}
+// Envío de datos por WebSocket únicamente. Función HTTP deshabilitada.
 
 // ========================================
 // LEGACY HTTP API - Currently unused (WebSocket preferred)

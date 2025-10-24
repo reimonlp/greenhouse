@@ -107,13 +107,10 @@
 #include "pins.h"
 
 // ========== CONFIGURACIÓN DE SISTEMA ==========
-// WiFi credentials are now defined ONLY in secrets.h
+// WiFi credentials se definen solo en secrets.h
 #define WIFI_CONNECT_TIMEOUT_MS 15000
 #define WIFI_RETRY_BASE_MS      5000
 
-// API y seguridad
-#define API_PORT            80
-#define MAX_API_REQUESTS    100  // Por minuto
 
 // NTP y tiempo
 #define NTP_SERVER          "pool.ntp.org"
@@ -165,7 +162,7 @@
 #define DHT_STABILIZE_DECAY_FACTOR 0.5f
 #endif
 
-// Calibración de sensores de humedad de suelo
+// Calibración del sensor de humedad de suelo
 #define SOIL_MOISTURE_DRY_VALUE    3000
 #define SOIL_MOISTURE_WET_VALUE    1000
 
@@ -210,17 +207,12 @@
 #define SYSTEM_STARTUP_DELAY_MS         1000    // Delay after serial init
 #define LOOP_ITERATION_DELAY_MS         10      // Delay in main loop iteration
 
-// HTTP Status Codes
-#define HTTP_STATUS_OK                  200
-#define HTTP_STATUS_CREATED             201
-#define HTTP_STATUS_UNAUTHORIZED        401
-#define HTTP_STATUS_FORBIDDEN           403
 
 // ========== CONFIGURACIÓN DE WATCHDOG ==========
 #define WATCHDOG_TIMEOUT_SEC    120
 
 // ========== CONFIGURACIÓN OTA ==========
-// OTA_PASSWORD is now defined only in secrets.h
+// OTA_PASSWORD se define solo en secrets.h
 #define OTA_PORT                3232
 
 // ========== CONFIGURACIÓN DE ALERTAS ==========
@@ -260,8 +252,7 @@ enum LogLevel {
 struct SensorData {
     float temperature;
     float humidity;
-    float soil_moisture_1;
-    float soil_moisture_2;
+    float soil_moisture;
     unsigned long timestamp;
     bool valid;
 };
@@ -285,8 +276,7 @@ struct SystemStats {
 };
 
 // ========== VERSIÓN DEL FIRMWARE ==========
-// FIRMWARE_VERSION is now defined ONLY in vps_config.h to avoid conflicts
-// Do NOT define it here - vps_config.h is the single source of truth
+// FIRMWARE_VERSION se define solo en vps_config.h para evitar conflictos
 #define BUILD_DATE              __DATE__ " " __TIME__
 // Schema version for persisted & JSON config exports
 #ifndef CONFIG_SCHEMA_VERSION
@@ -301,11 +291,8 @@ struct SystemStats {
 #ifndef VERBOSE_LOGS
 #define VERBOSE_LOGS 0
 #endif
-#ifndef MAX_API_REQUESTS
-#define MAX_API_REQUESTS 60
-#endif
 
-// Logging detallado (descomentar en platformio.ini con -D VERBOSE_LOGGING)
+// Logging detallado (activar en platformio.ini con -D VERBOSE_LOGGING)
 // #define VERBOSE_LOGGING 1
 
 // ========== CONTROL DE FEATURES / REDUCCIÓN ==========
@@ -320,34 +307,29 @@ struct SystemStats {
 // Desactivar OTA (reduce binario si no se usa actualización remota)
 // #define FEATURE_DISABLE_OTA 1
 
-// Desactivar envío remoto de base de datos (sustituye antiguo ENABLE_REMOTE_DB)
+// Desactivar envío remoto de base de datos
 // #define FEATURE_DISABLE_REMOTE_DB 1
 
 // Desactivar sensores de temperatura externos (DS18B20 en GPIO32/33) si no están conectados
-// Reduce código y evita logs de error de desconexión.
 // #define FEATURE_DISABLE_EXT_TEMPS 1
 
-// Habilitar validación HMAC opcional en endpoints sensibles (Authorization + X-Signature)
+// Habilitar validación HMAC opcional en endpoints sensibles
 // #define FEATURE_HMAC_AUTH 1
 
-// Habilitar restauración automática de assets web embebidos (index.html, style.css, script.js mínimos)
+// Habilitar restauración automática de assets web embebidos
 // Desactivar con -D ENABLE_EMBEDDED_ASSET_RESTORE=0 si no se desea incluir en firmware
 #ifndef ENABLE_EMBEDDED_ASSET_RESTORE
 #define ENABLE_EMBEDDED_ASSET_RESTORE 0  // Desactivado: simplificamos, sólo LittleFS sirve assets
 #endif
 
 // Control de política de sobrescritura:
-// 0 = Nunca sobrescribir si el archivo existe (aunque difiera en tamaño)
-// 1 = Sobrescribir sólo si falta (ignora mismatch)
-// 2 = Sobrescribir en mismatch (comportamiento original)
+// 0 = Nunca sobrescribir si el archivo existe
+// 1 = Sobrescribir sólo si falta
+// 2 = Sobrescribir en mismatch
 #ifndef EMBEDDED_ASSETS_OVERWRITE_MODE
 #define EMBEDDED_ASSETS_OVERWRITE_MODE 1
 #endif
 
-// Archivo para persistir hash de token/API (si se rota en runtime)
-#ifndef TOKEN_HASH_FILE
-#define TOKEN_HASH_FILE "/api_token.sha" // 32 bytes bin CRC-protected
-#endif
 
 // Ajustar tiempo de estabilización DHT (por defecto 2000ms en begin()):
 // DHT_STABILIZE_MS definido arriba en línea 138

@@ -139,11 +139,12 @@ void VPSWebSocketClient::handleConnected() {
     _metrics.totalConnections++;
     _metrics.lastConnectionTime = millis() / 1000;
     _lastActivity = millis();  // Reset activity timer on new connection
-    
+    // Encender LED integrado al conectar WebSocket
+    pinMode(STATUS_LED_PIN, OUTPUT);
+    LED_WRITE_ON(STATUS_LED_PIN);
     // Reset circuit breaker on successful connection
     _consecutiveFailures = 0;
     _circuitBreakerOpen = false;
-    
     if (_metrics.totalConnections > 1) {
         _metrics.reconnections++;
     }
@@ -153,17 +154,17 @@ void VPSWebSocketClient::handleConnected() {
 void VPSWebSocketClient::handleDisconnected() {
     _connected = false;
     _metrics.totalDisconnections++;
-    
+    // Apagar LED integrado al desconectar WebSocket
+    pinMode(STATUS_LED_PIN, OUTPUT);
+    LED_WRITE_OFF(STATUS_LED_PIN);
     // Increment consecutive failures for circuit breaker
     _consecutiveFailures++;
-    
     if (_consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
         _circuitBreakerOpen = true;
         _circuitBreakerOpenTime = millis();
         LOG_ERRORF("Circuit breaker OPEN: %d consecutive failures. Pausing for %lu seconds\n", 
                    _consecutiveFailures, CIRCUIT_BREAKER_TIMEOUT_MS / 1000);
     }
-    
     DEBUG_PRINTLN("✗ WebSocket disconnected from VPS");
 }
 
@@ -314,29 +315,17 @@ bool VPSWebSocketClient::sendSensorData(float temperature, float humidity, float
     data["humidity"] = humidity;
     data["temp_errors"] = tempErrors;
     data["humidity_errors"] = humidityErrors;
-    
-    if (soilMoisture >= 0) {
-        data["soil_moisture"] = soilMoisture;
-    }
-    
+    data["soil_moisture"] = soilMoisture;
     data["timestamp"] = millis();
-    
-    // Use static buffer to avoid String object allocation
-    char payload[512];  // Increased buffer size for safety
+    char payload[512];
     size_t len = 0;
-    
-    // Safe string building with bounds checking
     len += snprintf(payload + len, sizeof(payload) - len, "42[\"sensor:data\",");
-    
-    // Measure JSON size before serialization
     size_t json_size = measureJson(data);
-    size_t remaining = sizeof(payload) - len - 2;  // -2 for "]" and null terminator
-    
+    size_t remaining = sizeof(payload) - len - 2;
     if (json_size > remaining) {
         DEBUG_PRINTLN("ERROR: JSON payload too large for buffer!");
         return false;
     }
-    
     len += serializeJson(data, payload + len, remaining);
     
     // Safe append closing bracket

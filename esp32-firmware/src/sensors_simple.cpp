@@ -17,7 +17,7 @@ SensorManager::SensorManager() {
     lastSoilComplete = false;
     
     // Initialize data
-    currentData = {0.0, 0.0, 0.0, 0.0, 0, false};
+    currentData = {0.0, 0.0, 0.0, 0, false};
     lastValidData = currentData;
     
     // Initialize validation tracking
@@ -168,15 +168,15 @@ bool SensorManager::readSensors() {
     }
     
     // Read soil moisture (simplified)
-    float soil1 = readSoilMoisture(SOIL_MOISTURE_1_PIN);
-    currentData.soil_moisture_1 = convertSoilMoistureToPercentage(soil1);
+    float soil = readSoilMoisture(SOIL_MOISTURE_1_PIN);
+    currentData.soil_moisture = convertSoilMoistureToPercentage(soil);
     
     lastSoilComplete = true;
     
     // Consolidated sensor log with all available data
     if (lastDhtValid) {
-        if (currentData.soil_moisture_1 > 0) {
-            DEBUG_PRINTF("Sensors: T=%.1f°C H=%.1f%% Soil=%.0f%%\n", temp, hum, currentData.soil_moisture_1);
+        if (currentData.soil_moisture > 0) {
+            DEBUG_PRINTF("Sensors: T=%.1f°C H=%.1f%% Soil=%.0f%%\n", temp, hum, currentData.soil_moisture);
         } else {
             DEBUG_PRINTF("Sensors: T=%.1f°C H=%.1f%%\n", temp, hum);
         }
