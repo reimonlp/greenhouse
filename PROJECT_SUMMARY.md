@@ -262,7 +262,6 @@ greenhouse/
 ```cpp
 #define WIFI_SSID "Your_WiFi_Name"
 #define WIFI_PASSWORD "Your_WiFi_Password"
-#define API_TOKEN "32_character_minimum_random_string"
 #define OTA_HOSTNAME "ESP32_GREENHOUSE_01"
 #define OTA_PASSWORD "OTA_Update_Password"
 #define VPS_SERVER "backend.example.com"
@@ -510,10 +509,10 @@ pm2 logs greenhouse-backend | grep auth
 
 # Verify token match
 cat backend-websocket-update/.env | grep ESP32_AUTH_TOKEN
-cat esp32-firmware/include/secrets.h | grep API_TOKEN
 
 # Monitor Nginx
-tail -f /var/log/nginx/error.log
+tail -f /var/log/nginx/e
+rror.log
 ```
 
 ---

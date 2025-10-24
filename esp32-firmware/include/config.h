@@ -112,7 +112,6 @@
 #define WIFI_RETRY_BASE_MS      5000
 
 // API y seguridad
-// API_TOKEN is now defined ONLY in secrets.h
 #define API_PORT            80
 #define MAX_API_REQUESTS    100  // Por minuto
 

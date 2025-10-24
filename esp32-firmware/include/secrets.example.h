@@ -8,9 +8,6 @@
 #define WIFI_SSID        "TuSSID"
 #define WIFI_PASSWORD    "TuPasswordWiFi"
 
-// API token (>=24 chars aleatorios recomendados)
-#define API_TOKEN        "token_super_secreto"
-
 // Device authentication for VPS/WebSocket (change in production!)
 #define DEVICE_AUTH_TOKEN "esp32_greenhouse_secure_token_2024_change_this"
 
