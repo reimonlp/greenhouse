@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const sensorReadingSchema = new mongoose.Schema({
+  external_humidity: {
+    type: Number,
+    default: null
+  },
   device_id: {
     type: String,
     required: true,

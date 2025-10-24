@@ -1,3 +1,6 @@
+    float externalHumidity = -1;
+    void setExternalHumidity(float value);
+    void clearExternalHumidity();
 #ifndef SENSORS_H
 #define SENSORS_H
 
