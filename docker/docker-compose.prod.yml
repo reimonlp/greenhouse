@@ -28,11 +28,11 @@ services:
 
   app:
     # Opción 1: Usar imagen pusheada a DockerHub
-    image: ${DOCKER_IMAGE:-local/greenhouse:latest}
+    # image: ${DOCKER_IMAGE:-local/greenhouse:latest}
     # Opción 2: Build local si está disponible
-    # build:
-    #   context: ..
-    #   dockerfile: docker/Dockerfile
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     
     container_name: greenhouse-app
     depends_on:
