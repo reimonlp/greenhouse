@@ -1,9 +1,3 @@
-version: '3.9'
-
-# PRODUCCIÓN - USAR EN VPS
-# Lee .env.production para credenciales sensibles
-# No expone puertos al exterior (solo localhost para Nginx proxy)
-
 services:
   mongodb:
     image: mongo:7-alpine
