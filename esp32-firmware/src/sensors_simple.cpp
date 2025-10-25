@@ -160,18 +160,19 @@ bool SensorManager::readSensors() {
         currentData.valid = true;
         lastValidData = currentData;
     } else {
-        // Check if sensor might be faulty
-        if (consecutiveTempErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
-            LOG_ERRORF("Temperature sensor validation failed: %d consecutive errors - sensor may be malfunctioning or disconnected\n", 
-                       consecutiveTempErrors);
+        // Suprimir advertencias si la humedad de la API es alta
+        bool suppressWarnings = (externalHumidity > 90.0f);
+        if (!suppressWarnings) {
+            if (consecutiveTempErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
+                LOG_ERRORF("Temperature sensor validation failed: %d consecutive errors - sensor may be malfunctioning or disconnected\n", 
+                           consecutiveTempErrors);
+            }
+            if (consecutiveHumidityErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
+                LOG_ERRORF("Humidity sensor validation failed: %d consecutive errors - sensor may be malfunctioning or disconnected\n", 
+                           consecutiveHumidityErrors);
+            }
         }
-        if (consecutiveHumidityErrors >= SENSOR_MAX_CONSECUTIVE_ERRORS) {
-            LOG_ERRORF("Humidity sensor validation failed: %d consecutive errors - sensor may be malfunctioning or disconnected\n", 
-                       consecutiveHumidityErrors);
-        }
-        
         // Use last measured readings when current readings are invalid
-        // This shows the actual last sensor reading, even if it was invalid
         currentData.temperature = lastMeasuredTemp;
         currentData.humidity = lastMeasuredHumidity;
         currentData.timestamp = now;
