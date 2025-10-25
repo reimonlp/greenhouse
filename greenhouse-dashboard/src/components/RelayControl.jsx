@@ -18,7 +18,7 @@ import {
   AutoMode,
   TouchApp
 } from '@mui/icons-material';
-import { setRelayState } from '../services/api';
+import webSocketService from '../services/websocket';
 
 const RELAY_NAMES = {
   0: { name: 'Luces', icon: <Lightbulb /> },
@@ -31,41 +31,35 @@ function RelayControl({ relay, onToggle }) {
   const [loading, setLoading] = useState(false);
   const relayInfo = RELAY_NAMES[relay.relay_id] || { name: `Relé ${relay.relay_id}`, icon: <Lightbulb /> };
 
-  const handleToggle = async () => {
+  const handleToggle = () => {
     setLoading(true);
-    try {
-      const newState = !relay.state;
-      await setRelayState(relay.relay_id, newState, 'manual', 'user');
-      
-      // Notify parent to refresh states
-      if (onToggle) {
-        onToggle();
-      }
-    } catch (error) {
-      console.error('Error toggling relay:', error);
-      alert('Error al cambiar el estado del relé');
-    } finally {
-      setLoading(false);
+    const newState = !relay.state;
+    webSocketService.socket.emit('relay:command', {
+      relay_id: relay.relay_id,
+      state: newState,
+      mode: 'manual',
+      changed_by: 'user'
+    });
+    // Notify parent to refresh states
+    if (onToggle) {
+      onToggle();
     }
+    setLoading(false);
   };
 
-  const handleModeToggle = async () => {
+  const handleModeToggle = () => {
     setLoading(true);
-    try {
-      const newMode = relay.mode === 'manual' ? 'auto' : 'manual';
-      // Mantener el estado actual pero cambiar el modo
-      await setRelayState(relay.relay_id, relay.state, newMode, newMode === 'manual' ? 'user' : 'system');
-      
-      // Notify parent to refresh states
-      if (onToggle) {
-        onToggle();
-      }
-    } catch (error) {
-      console.error('Error changing relay mode:', error);
-      alert('Error al cambiar el modo del relé');
-    } finally {
-      setLoading(false);
+    const newMode = relay.mode === 'manual' ? 'auto' : 'manual';
+    webSocketService.socket.emit('relay:command', {
+      relay_id: relay.relay_id,
+      state: relay.state,
+      mode: newMode,
+      changed_by: newMode === 'manual' ? 'user' : 'system'
+    });
+    if (onToggle) {
+      onToggle();
     }
+    setLoading(false);
   };
 
   return (

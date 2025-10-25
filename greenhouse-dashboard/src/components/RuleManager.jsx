@@ -26,11 +26,9 @@ import {
   Chip
 } from '@mui/material';
 import { Delete, Add, Edit } from '@mui/icons-material';
-import { getRules, createRule, updateRule, deleteRule } from '../services/api';
 
 const RELAY_NAMES = ['Luces', 'Ventilador', 'Bomba', 'Calefactor'];
 const SENSOR_TYPES = ['temperature', 'humidity', 'soil_moisture'];
-const OPERATORS = ['>', '<', '>=', '<=', '=='];
 const DAYS_OF_WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 function RuleManager() {
@@ -57,24 +55,28 @@ function RuleManager() {
     action: 'on'
   });
 
-  const fetchRules = async () => {
-    try {
-      setError(null);
-      const response = await getRules();
+  useEffect(() => {
+    setLoading(true);
+    webSocketService.socket.emit('rule:list');
+    const unsubscribe = webSocketService.on('rule:list', (response) => {
       if (response.success) {
         setRules(response.data);
       }
       setLoading(false);
-    } catch (err) {
-      console.error('Error fetching rules:', err);
-      setError('Error al cargar reglas');
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRules();
+    });
+    return () => unsubscribe();
   }, []);
+    useEffect(() => {
+      setLoading(true);
+      webSocketService.socket.emit('rule:list');
+      const unsubscribe = webSocketService.on('rule:list', (response) => {
+        if (response.success) {
+          setRules(response.data);
+        }
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }, []);
 
   const handleOpenDialog = () => {
     setEditingRule(null);
@@ -99,75 +101,52 @@ function RuleManager() {
         time: '06:00',
         days: [0, 1, 2, 3, 4, 5, 6]
       },
-      action: rule.action
-    });
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setEditingRule(null);
-    setRuleType('sensor');
-    setNewRule({
-      name: '',
-      relay_id: 0,
-      enabled: true,
-      rule_type: 'sensor',
-      condition: {
-        sensor: 'temperature',
-        operator: '>',
-        threshold: 25
-      },
-      schedule: {
-        time: '06:00',
-        days: [0, 1, 2, 3, 4, 5, 6]
-      },
-      action: 'on'
+      action: rule.action || 'on'
     });
   };
 
-  const handleCreateRule = async () => {
-    try {
-      await createRule(newRule);
-      await fetchRules();
-      handleCloseDialog();
-    } catch (err) {
-      console.error('Error creating rule:', err);
-      alert('Error al crear regla');
-    }
-  };
+    // Handler único para crear/actualizar reglas
+    const handleSaveRule = () => {
+      if (editingRule) {
+        // Actualizar regla existente
+        setLoading(true);
+        webSocketService.socket.emit('rule:update', { ruleId: editingRule._id, ruleData: newRule });
+        const unsubscribe = webSocketService.on('rule:updated', (response) => {
+          if (response.success) {
+            webSocketService.socket.emit('rule:list');
+          }
+          setLoading(false);
+          handleCloseDialog();
+          unsubscribe();
+        });
+      } else {
+        // Crear nueva regla
+        setLoading(true);
+        webSocketService.socket.emit('rule:create', newRule);
+        const unsubscribe = webSocketService.on('rule:created', (response) => {
+          if (response.success) {
+            webSocketService.socket.emit('rule:list');
+          }
+          setLoading(false);
+          handleCloseDialog();
+          unsubscribe();
+        });
+      }
+    };
 
-  const handleUpdateRule = async () => {
-    try {
-      await updateRule(editingRule._id, newRule);
-      await fetchRules();
-      handleCloseDialog();
-    } catch (err) {
-      console.error('Error updating rule:', err);
-      alert('Error al actualizar regla');
-    }
-  };
-
-  const handleSaveRule = () => {
-    if (editingRule) {
-      handleUpdateRule();
-    } else {
-      handleCreateRule();
-    }
-  };
-
-  const handleDeleteRule = async (ruleId) => {
-    if (!window.confirm('¿Estás seguro de eliminar esta regla?')) {
-      return;
-    }
-    
-    try {
-      await deleteRule(ruleId);
-      await fetchRules();
-    } catch (err) {
-      console.error('Error deleting rule:', err);
-      alert('Error al eliminar regla');
-    }
+    // Handler para borrar reglas
+    const handleDeleteRule = (ruleId) => {
+      setLoading(true);
+      webSocketService.socket.emit('rule:delete', { ruleId });
+      const unsubscribe = webSocketService.on('rule:deleted', (response) => {
+        if (response.success) {
+          webSocketService.socket.emit('rule:list');
+        }
+        setLoading(false);
+        unsubscribe();
+      });
+    };
+    // ...eliminado: código HTTP residual y bloque try/catch...
   };
 
   const getSensorLabel = (sensor) => {
@@ -439,6 +418,4 @@ function RuleManager() {
       </Dialog>
     </Paper>
   );
-}
-
 export default RuleManager;

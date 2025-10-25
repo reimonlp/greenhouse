@@ -21,7 +21,8 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { getSensorReadings } from '../services/api';
+import { useEffect, useState } from 'react';
+import webSocketService from '../services/websocket';
 
 const TIME_RANGES = {
   '1h': { label: '1 Hora', ms: 60 * 60 * 1000 },
@@ -36,11 +37,13 @@ function SensorChart() {
   const [timeRange, setTimeRange] = useState('6h');
   const [selectedSensors, setSelectedSensors] = useState(['temperature', 'humidity']);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      // Pedir más lecturas para asegurar cobertura del rango
-      const response = await getSensorReadings(2000);
+  // Recibe datos históricos por WebSocket
+  useEffect(() => {
+    setLoading(true);
+    // Solicitar datos históricos al backend por WebSocket
+    webSocketService.socket.emit('sensor:history', { limit: 2000 });
+    // Escuchar respuesta
+    const unsubscribe = webSocketService.on('sensor:history', (response) => {
       if (response.success && response.data) {
         const now = Date.now();
         const rangeMs = TIME_RANGES[timeRange].ms;
@@ -66,19 +69,16 @@ function SensorChart() {
         setData(transformedData);
       }
       setLoading(false);
-    } catch (err) {
-      console.error('Error fetching sensor data:', err);
-      setLoading(false);
-    }
-  };
+    });
+    return () => unsubscribe();
+  }, [timeRange]);
 
   useEffect(() => {
-    fetchData();
-    
-    // Auto refresh based on time range
-    const refreshInterval = timeRange === '1h' ? 30000 : 60000; // 30s or 60s
-    const interval = setInterval(fetchData, refreshInterval);
-    
+    // Auto refresh basado en el rango de tiempo
+    const refreshInterval = timeRange === '1h' ? 30000 : 60000;
+    const interval = setInterval(() => {
+      webSocketService.socket.emit('sensor:history', { limit: 2000 });
+    }, refreshInterval);
     return () => clearInterval(interval);
   }, [timeRange]);
 

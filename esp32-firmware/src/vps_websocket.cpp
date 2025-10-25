@@ -222,10 +222,10 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
             return;
         }
         
-        const char* eventName = doc[0];
-        if (!eventName) return;
-        
-        DEBUG_PRINTF("Event received: %s\n", eventName);
+    const char* eventName = doc[0];
+    if (!eventName) return;
+    // Log en el serial cada vez que se recibe un evento por WebSocket
+    DEBUG_PRINTF("[WS] Evento recibido: %s\n", eventName);
         
         if (strcmp(eventName, "sensor:climate") == 0 && doc.size() >= 2) {
             JsonObject data = doc[1];

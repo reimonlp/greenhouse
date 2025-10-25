@@ -39,167 +39,114 @@ function Dashboard() {
 
   // Actualizar sensores cuando llegan por WebSocket
   useEffect(() => {
-    if (latestSensor) {
-      setSensorData(latestSensor);
-    }
-  }, [latestSensor]);
-
-  // Escuchar cambios de relay por WebSocket
-  useEffect(() => {
-    const handleRelayChange = (data) => {
-      setRelayStates(prev => {
-        const index = prev.findIndex(r => r.relay_id === data.relay_id);
-        if (index >= 0) {
-          const updated = [...prev];
-          updated[index] = data;
-          return updated;
-        }
-        return prev; // No agregar si no existe
-      });
-    };
-
-    // Importar el servicio y suscribirse
-    import('../services/websocket').then(({ default: ws }) => {
-      const unsubscribe = ws.on('relay:changed', handleRelayChange);
-      return unsubscribe;
+    // Solicitar datos iniciales por WebSocket
+    setLoading(true);
+    webSocketService.socket.emit('sensor:latest');
+    const unsubSensor = webSocketService.on('sensor:latest', (response) => {
+      if (response.success && response.data) {
+        setSensorData(response.data);
+      }
+      setLoading(false);
     });
+    webSocketService.socket.emit('relay:states');
+    const unsubRelay = webSocketService.on('relay:states', (response) => {
+      if (response.success && response.data) {
+        setRelayStates(response.data);
+      }
+    });
+    return () => {
+      unsubSensor();
+      unsubRelay();
+    };
   }, []);
 
-  // Cargar datos iniciales
-  const fetchData = async () => {
-    try {
-      setError(null);
-      
-      // Fetch sensor data
-      const sensorResponse = await getLatestSensorReading();
-      if (sensorResponse.success && sensorResponse.data) {
-        setSensorData(sensorResponse.data);
-      }
+  // Render principal
+  return (
+    <Box sx={{ flexGrow: 1, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
+      <AppBar position="static" sx={{ bgcolor: '#2e7d32' }}>
+        <Toolbar>
+          <WaterDrop sx={{ mr: 2 }} />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Greenhouse Monitor
+          </Typography>
+          <Chip 
+            icon={isConnected ? <Wifi /> : <WifiOff />}
+            label={isConnected ? "Conectado" : "Desconectado"}
+            color={isConnected ? "success" : "error"}
+            size="small"
+            sx={{ mr: 2 }}
+          />
+          <Typography variant="body2">
+            {new Date().toLocaleString('es-AR', { hour12: false })}
+          </Typography>
+        </Toolbar>
+      </AppBar>
 
-      // Fetch relay states
-      const relayResponse = await getRelayStates();
-      if (relayResponse.success && relayResponse.data) {
-        setRelayStates(relayResponse.data);
-      }
-
-      setLoading(false);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      return (
-        <Box sx={{ flexGrow: 1, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
-          <AppBar position="static" sx={{ bgcolor: '#2e7d32' }}>
-            <Toolbar>
-              <WaterDrop sx={{ mr: 2 }} />
-              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                Greenhouse Monitor
-              </Typography>
-              <Chip 
-                icon={isConnected ? <Wifi /> : <WifiOff />}
-                label={isConnected ? "Conectado" : "Desconectado"}
-                color={isConnected ? "success" : "error"}
-                size="small"
-                sx={{ mr: 2 }}
-              />
-              <Typography variant="body2">
-                {new Date().toLocaleString('es-AR', { hour12: false })}
-              </Typography>
-            </Toolbar>
-          </AppBar>
-
-          <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            {stormData && (
-              <Alert severity="warning" variant="filled" sx={{ mb: 3 }}>
-                <Typography variant="h6">Situación de tormenta detectada</Typography>
-                <Typography variant="body1">
-                  Humedad del sensor: <b>{stormData.sensor_humidity}%</b><br />
-                  Humedad actual en La Plata: <b>{stormData.ciudad_humidity ? `${stormData.ciudad_humidity}%` : 'No disponible'}</b>
-                </Typography>
-                {stormData.api_error && (
-                  <Typography variant="caption" color="error">Error API: {stormData.api_error}</Typography>
-                )}
-              </Alert>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        {stormData && (
+          <Alert severity="warning" variant="filled" sx={{ mb: 3 }}>
+            <Typography variant="h6">Situación de tormenta detectada</Typography>
+            <Typography variant="body1">
+              Humedad del sensor: <b>{stormData.sensor_humidity}%</b><br />
+              Humedad actual en La Plata: <b>{stormData.ciudad_humidity ? `${stormData.ciudad_humidity}%` : 'No disponible'}</b>
+            </Typography>
+            {stormData.api_error && (
+              <Typography variant="caption" color="error">Error API: {stormData.api_error}</Typography>
             )}
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            )}
+          </Alert>
+        )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
 
-            {/* Sensor Cards */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} md={4}>
-                <SensorCard
-                  title="Temperatura"
-                  value={sensorData?.temperature || 0}
-                  unit="°C"
-                  icon={<Thermostat />}
-                  color="#ef5350"
-                  errorCount={sensorData?.temp_errors || 0}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <SensorCard
-                  title="Humedad"
-                  value={typeof sensorData?.external_humidity === 'number' && sensorData?.external_humidity >= 0 ? sensorData.external_humidity : sensorData?.humidity || 0}
-                  unit="%"
-                  icon={<Opacity />}
-                  color="#42a5f5"
-                  errorCount={sensorData?.humidity_errors || 0}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <SensorCard
-                  title="Humedad Suelo"
-                  value={sensorData?.soil_moisture || 0}
-                  unit="%"
-                  icon={<WaterDrop />}
-                  color="#8d6e63"
-                />
-              </Grid>
-            </Grid>
+        {/* Sensor Cards */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={4}>
+            <SensorCard
+              title="Temperatura"
+              value={sensorData?.temperature || 0}
+              unit="°C"
+              icon={<Thermostat />}
+              color="#ef5350"
+              errorCount={sensorData?.temp_errors || 0}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <SensorCard
+              title="Humedad"
+              value={typeof sensorData?.external_humidity === 'number' && sensorData?.external_humidity >= 0 ? sensorData.external_humidity : sensorData?.humidity || 0}
+              unit="%"
+              icon={<Opacity />}
+              color="#42a5f5"
+              errorCount={sensorData?.humidity_errors || 0}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <SensorCard
+              title="Humedad Suelo"
+              value={sensorData?.soil_moisture || 0}
+              unit="%"
+              icon={<WaterDrop />}
+              color="#8d6e63"
+            />
+          </Grid>
+        </Grid>
 
-            {/* Chart Modal Button */}
-            <Box sx={{ mb: 4, textAlign: 'center' }}>
-              <Button
-                variant="contained"
-                startIcon={<ShowChart />}
-                onClick={() => setChartModalOpen(true)}
-                sx={{ 
-                  bgcolor: '#2e7d32',
-                  '&:hover': { bgcolor: '#1b5e20' },
-                  px: 4,
-                  py: 1.5
-                }}
-              >
-                Ver Gráficos de Sensores
-              </Button>
-            </Box>
-
-            {/* Relay Controls */}
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-                Control de Relés
-              </Typography>
-              <Grid container spacing={2}>
-                {relayStates.map((relay) => (
-                  <Grid item xs={12} sm={6} md={3} key={relay.relay_id}>
-                    <RelayControl 
-                      relay={relay} 
-                      onToggle={handleRelayToggle}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-            </Paper>
-
-            {/* Rule Manager */}
-            <RuleManager />
-
-            {/* Log Viewer */}
-            <LogViewer />
-          </Container>
-        </Box>
-      );
+        {/* Chart Modal Button */}
+        <Box sx={{ mb: 4, textAlign: 'center' }}>
+          <Button
+            variant="contained"
+            startIcon={<ShowChart />}
+            onClick={() => setChartModalOpen(true)}
+            sx={{ 
+              bgcolor: '#2e7d32',
+              '&:hover': { bgcolor: '#1b5e20' },
+              px: 4,
+              py: 1.5
+            }}
+          >
             Ver Gráficos de Sensores
           </Button>
         </Box>
@@ -220,6 +167,8 @@ function Dashboard() {
             ))}
           </Grid>
         </Paper>
+
+// Eliminar fragmentos sueltos fuera del return principal
 
         {/* Rule Manager */}
         <RuleManager />

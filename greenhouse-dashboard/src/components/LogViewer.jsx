@@ -27,7 +27,7 @@ import {
   ExpandMore,
   ExpandLess
 } from '@mui/icons-material';
-import { getLogs } from '../services/api';
+import webSocketService from '../services/websocket';
 
 const LOG_LEVELS = {
   info: { color: 'info', icon: <Info fontSize="small" /> },
@@ -46,23 +46,34 @@ function LogViewer() {
   const [filterSource, setFilterSource] = useState('all');
   const [expandedRows, setExpandedRows] = useState({});
 
-  const fetchLogs = async () => {
-    try {
-      setError(null);
-      const level = filterLevel === 'all' ? undefined : filterLevel;
-      const source = filterSource === 'all' ? undefined : filterSource;
-      
-      const response = await getLogs(50, level, source);
+  useEffect(() => {
+    setLoading(true);
+    // Solicitar logs por WebSocket
+    webSocketService.socket.emit('log:list', {
+      limit: 50,
+      level: filterLevel === 'all' ? undefined : filterLevel,
+      source: filterSource === 'all' ? undefined : filterSource
+    });
+    // Escuchar respuesta
+    const unsubscribe = webSocketService.on('log:list', (response) => {
       if (response.success) {
         setLogs(response.data);
       }
       setLoading(false);
-    } catch (err) {
-      console.error('Error fetching logs:', err);
-      setError('Error al cargar logs');
-      setLoading(false);
-    }
-  };
+    });
+    // Auto refresh cada 10 segundos
+    const interval = setInterval(() => {
+      webSocketService.socket.emit('log:list', {
+        limit: 50,
+        level: filterLevel === 'all' ? undefined : filterLevel,
+        source: filterSource === 'all' ? undefined : filterSource
+      });
+    }, 10000);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
+  }, [filterLevel, filterSource]);
 
   useEffect(() => {
     fetchLogs();
