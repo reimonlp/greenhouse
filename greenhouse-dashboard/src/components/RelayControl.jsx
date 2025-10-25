@@ -40,7 +40,6 @@ function RelayControl({ relay, onToggle }) {
       mode: 'manual',
       changed_by: 'user'
     });
-    // Notify parent to refresh states
     if (onToggle) {
       onToggle();
     }

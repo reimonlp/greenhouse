@@ -20,11 +20,11 @@ import RelayControl from './RelayControl';
 import RuleManager from './RuleManager';
 import SensorChart from './SensorChart';
 import LogViewer from './LogViewer';
-import { getLatestSensorReading, getRelayStates } from '../services/api';
+import webSocketService from '../services/websocket';
 import { useWebSocket, useSensorUpdates } from '../hooks/useWebSocket';
 
 function Dashboard() {
-  // Storm event hook
+  // Evento de tormenta por WebSocket
   const { useStormEvent } = require('../hooks/useWebSocket');
   const stormData = typeof useStormEvent === 'function' ? useStormEvent() : null;
   const [sensorData, setSensorData] = useState(null);
@@ -32,14 +32,9 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [chartModalOpen, setChartModalOpen] = useState(false);
-  
-  // WebSocket hooks
   const { isConnected } = useWebSocket();
-  const latestSensor = useSensorUpdates();
 
-  // Actualizar sensores cuando llegan por WebSocket
   useEffect(() => {
-    // Solicitar datos iniciales por WebSocket
     setLoading(true);
     webSocketService.socket.emit('sensor:latest');
     const unsubSensor = webSocketService.on('sensor:latest', (response) => {

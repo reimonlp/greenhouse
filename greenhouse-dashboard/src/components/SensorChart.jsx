@@ -37,17 +37,13 @@ function SensorChart() {
   const [timeRange, setTimeRange] = useState('6h');
   const [selectedSensors, setSelectedSensors] = useState(['temperature', 'humidity']);
 
-  // Recibe datos históricos por WebSocket
   useEffect(() => {
     setLoading(true);
-    // Solicitar datos históricos al backend por WebSocket
     webSocketService.socket.emit('sensor:history', { limit: 2000 });
-    // Escuchar respuesta
     const unsubscribe = webSocketService.on('sensor:history', (response) => {
       if (response.success && response.data) {
         const now = Date.now();
         const rangeMs = TIME_RANGES[timeRange].ms;
-        // Filtrar por timestamp
         const filtered = response.data.filter(reading => {
           const ts = new Date(reading.timestamp).getTime();
           return now - ts <= rangeMs;
@@ -74,7 +70,6 @@ function SensorChart() {
   }, [timeRange]);
 
   useEffect(() => {
-    // Auto refresh basado en el rango de tiempo
     const refreshInterval = timeRange === '1h' ? 30000 : 60000;
     const interval = setInterval(() => {
       webSocketService.socket.emit('sensor:history', { limit: 2000 });

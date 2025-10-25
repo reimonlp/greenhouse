@@ -48,20 +48,17 @@ function LogViewer() {
 
   useEffect(() => {
     setLoading(true);
-    // Solicitar logs por WebSocket
     webSocketService.socket.emit('log:list', {
       limit: 50,
       level: filterLevel === 'all' ? undefined : filterLevel,
       source: filterSource === 'all' ? undefined : filterSource
     });
-    // Escuchar respuesta
     const unsubscribe = webSocketService.on('log:list', (response) => {
       if (response.success) {
         setLogs(response.data);
       }
       setLoading(false);
     });
-    // Auto refresh cada 10 segundos
     const interval = setInterval(() => {
       webSocketService.socket.emit('log:list', {
         limit: 50,
@@ -73,15 +70,6 @@ function LogViewer() {
       clearInterval(interval);
       unsubscribe();
     };
-  }, [filterLevel, filterSource]);
-
-  useEffect(() => {
-    fetchLogs();
-    
-    // Auto refresh every 10 seconds
-    const interval = setInterval(fetchLogs, 10000);
-    
-    return () => clearInterval(interval);
   }, [filterLevel, filterSource]);
 
   const handleToggleRow = (logId) => {

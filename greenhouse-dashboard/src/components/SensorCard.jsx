@@ -4,20 +4,12 @@ import { TrendingUp, TrendingDown, Warning } from '@mui/icons-material';
 function SensorCard({ title, value, unit, icon, color, errorCount = 0 }) {
   const formattedValue = typeof value === 'number' ? value.toFixed(1) : '0.0';
   
-  // Determine if value is in good range (simplified logic)
+  // Color de estado del sensor
   const getStatusColor = () => {
-    // If there are sensor errors, show warning color
-    if (errorCount > 0) {
-      return '#ff9800'; // Orange warning color
-    }
-    
-    if (title === 'Temperatura') {
-      return value >= 15 && value <= 30 ? '#4caf50' : '#ff9800';
-    } else if (title === 'Humedad') {
-      return value >= 40 && value <= 70 ? '#4caf50' : '#ff9800';
-    } else if (title === 'Humedad Suelo') {
-      return value >= 30 && value <= 70 ? '#4caf50' : '#ff9800';
-    }
+    if (errorCount > 0) return '#ff9800';
+    if (title === 'Temperatura') return value >= 15 && value <= 30 ? '#4caf50' : '#ff9800';
+    if (title === 'Humedad') return value >= 40 && value <= 70 ? '#4caf50' : '#ff9800';
+    if (title === 'Humedad Suelo') return value >= 30 && value <= 70 ? '#4caf50' : '#ff9800';
     return color;
   };
 

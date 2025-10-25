@@ -1,16 +1,14 @@
+import { useEffect, useState, useCallback } from 'react';
+import webSocketService from '../services/websocket';
+
 export function useStormEvent() {
   const [stormData, setStormData] = useState(null);
-
   const handleStorm = useCallback((data) => {
     setStormData(data);
   }, []);
-
   useWebSocketEvent('sensor:storm', handleStorm);
-
   return stormData;
 }
-import { useEffect, useState, useCallback } from 'react';
-import webSocketService from '../services/websocket';
 
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
