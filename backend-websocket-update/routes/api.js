@@ -64,6 +64,13 @@ function setupApiRoutes(app, ioInstance, esp32Token, evaluateSensorRulesFn) {
   app.use('/api/', limiter);
 
   // ====== Sensor Endpoints ======
+  // Cache para la humedad de la ciudad
+  let climateCache = {
+    value: null,
+    error: null,
+    timestamp: 0
+  };
+
   app.post('/api/sensors', authenticateESP32, async (req, res) => {
     try {
       const reading = new SensorReading(req.body);
@@ -74,27 +81,36 @@ function setupApiRoutes(app, ioInstance, esp32Token, evaluateSensorRulesFn) {
         ? reading.external_humidity
         : reading.humidity;
 
-      // Consulta a Open-Meteo (sin API key, gratuita) - SIEMPRE
+      // Consulta a Open-Meteo solo si el cache está vencido
       const fetch = require('node-fetch');
       const LAT_LA_PLATA = -34.9214;
       const LON_LA_PLATA = -57.9544;
-      let ciudadHumidity = null;
-      let apiError = null;
-      try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT_LA_PLATA}&longitude=${LON_LA_PLATA}&current_weather=true`;
-        const response = await fetch(url);
-        const data = await response.json();
-        ciudadHumidity = data?.current_weather?.relative_humidity ?? null;
-      } catch (err) {
-        apiError = err.message;
+      let ciudadHumidity = climateCache.value;
+      let apiError = climateCache.error;
+      const now = Date.now();
+      if (!climateCache.timestamp || (now - climateCache.timestamp > 5 * 60 * 1000)) {
+        try {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT_LA_PLATA}&longitude=${LON_LA_PLATA}&current_weather=true`;
+          const response = await fetch(url);
+          const data = await response.json();
+          ciudadHumidity = data?.current_weather?.relative_humidity ?? null;
+          apiError = null;
+          climateCache.value = ciudadHumidity;
+          climateCache.error = null;
+          climateCache.timestamp = now;
+        } catch (err) {
+          apiError = err.message;
+          climateCache.error = apiError;
+          climateCache.timestamp = now;
+        }
       }
 
-      // Emitir evento de clima SIEMPRE
-      io.emit('sensor:climate', {
-        ciudad: 'La Plata',
-        ciudad_humidity: ciudadHumidity,
-        api_error: apiError
-      });
+      // Emitir evento de clima global solo si lo deseas
+      // io.emit('sensor:climate', {
+      //   ciudad: 'La Plata',
+      //   ciudad_humidity: ciudadHumidity,
+      //   api_error: apiError
+      // });
 
       // Emitir evento de tormenta si corresponde
       if (humidityToUse >= 95) {
@@ -108,6 +124,21 @@ function setupApiRoutes(app, ioInstance, esp32Token, evaluateSensorRulesFn) {
       } else {
         // Emitir evento WebSocket con nueva lectura normal
         io.emit('sensor:new', reading);
+      }
+
+      // Si la humedad está fuera de rango, responder solo al socket del ESP32
+      if (humidityToUse < 20 || humidityToUse > 90) {
+        // Buscar el socket del ESP32 por algún identificador si está disponible
+        // Aquí se asume que puedes obtener el socket desde req (por ejemplo, req.deviceSocket)
+        // Si usas socket.io con autenticación, puedes mapear device_id a socket
+        // Ejemplo genérico:
+        if (req.deviceSocket) {
+          req.deviceSocket.emit('sensor:climate', {
+            ciudad: 'La Plata',
+            ciudad_humidity: ciudadHumidity,
+            api_error: apiError
+          });
+        }
       }
 
       // Pasar el valor correcto a las reglas

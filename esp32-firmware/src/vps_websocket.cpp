@@ -227,6 +227,19 @@ void VPSWebSocketClient::handleMessage(uint8_t * payload, size_t length) {
         
         DEBUG_PRINTF("Event received: %s\n", eventName);
         
+        if (strcmp(eventName, "sensor:climate") == 0 && doc.size() >= 2) {
+            JsonObject data = doc[1];
+            float ciudadHumidity = data["ciudad_humidity"] | -1;
+            const char* ciudad = data["ciudad"] | "";
+            const char* apiError = data["api_error"] | "";
+            DEBUG_PRINTF("[CLIMA] Humedad ciudad (%s): %.1f%%\n", ciudad, ciudadHumidity);
+            if (apiError && strlen(apiError) > 0) {
+                DEBUG_PRINTF("Error API meteorológica: %s\n", apiError);
+            }
+            extern SensorManager sensors;
+            sensors.setExternalHumidity(ciudadHumidity);
+            return;
+        }
         if (strcmp(eventName, "device:auth_success") == 0) {
             DEBUG_PRINTLN("[OK] Authentication successful");
             _authFailed = false;
