@@ -1,5 +1,3 @@
-# Multi-stage Dockerfile for Greenhouse System
-# Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
@@ -15,9 +13,6 @@ COPY greenhouse-dashboard/ ./
 
 # Build frontend
 RUN npm run build
-
-# Verify build
-RUN ls -la dist/ && echo "✅ Frontend build successful"
 
 # Stage 2: Setup Backend (Express serves frontend)
 FROM node:20-alpine
@@ -44,7 +39,6 @@ RUN npm ci --prefer-offline --no-audit --omit=dev
 # Copy backend source
 COPY backend-websocket-update/ ./
 
-# Copy built frontend from previous stage
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Create health check script
