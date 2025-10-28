@@ -58,7 +58,8 @@ services:
     volumes:
       - ./logs/app:/app/backend/logs
       - /home/rei/greenhouse/greenhouse-dashboard/dist:/app/frontend/dist
-    
+      - /home/rei/greenhouse/backend-websocket-update/dist:/app/backend
+         
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
