@@ -12,17 +12,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react')) return 'react';
-            if (id.includes('recharts')) return 'recharts';
-            if (id.includes('mui')) return 'mui';
-            return 'vendor';
-          }
-        }
-      }
-    }
+    // Sin manualChunks: dejar que Vite/Rollup gestione los chunks automáticamente
   }
 })
