@@ -1,0 +1,8 @@
+node_modules
+.vite
+.eslint*
+.git
+src/**/*.test.*
+src/**/*.spec.*
+dist/
+README.md

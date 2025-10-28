@@ -54,7 +54,6 @@ Thumbs.db
 
 # Docker/Container
 .docker/
-.dockerignore
 *.tar.gz
 
 # IDE

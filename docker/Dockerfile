@@ -22,6 +22,7 @@ RUN apk add --no-cache \
     curl \
     bash \
     jq \
+    git \
     && rm -rf /var/cache/apk/*
 
 # Create directories
