@@ -34,7 +34,7 @@ function RelayControl({ relay, onToggle }) {
   const handleToggle = () => {
     setLoading(true);
     const newState = !relay.state;
-    webSocketService.socket.emit('relay:command', {
+  webSocketService.emitToServer('relay:command', {
       relay_id: relay.relay_id,
       state: newState,
       mode: 'manual',
@@ -49,7 +49,7 @@ function RelayControl({ relay, onToggle }) {
   const handleModeToggle = () => {
     setLoading(true);
     const newMode = relay.mode === 'manual' ? 'auto' : 'manual';
-    webSocketService.socket.emit('relay:command', {
+  webSocketService.emitToServer('relay:command', {
       relay_id: relay.relay_id,
       state: relay.state,
       mode: newMode,

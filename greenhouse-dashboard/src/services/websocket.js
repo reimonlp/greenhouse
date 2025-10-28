@@ -112,10 +112,13 @@ class WebSocketService {
   emitToServer(event, data) {
     if (this.socket && this.socket.connected) {
       this.socket.emit(event, data);
+    } else {
+      console.error('[WebSocketService] Socket is null or not connected, cannot emit event:', event, data);
     }
   }
 
   // Emitir evento local (listeners internos)
+  // Emit is for local listeners only. Use emitToServer for server events.
   emit(event, data) {
     if (!this.listeners.has(event)) return;
     this.listeners.get(event).forEach(callback => {

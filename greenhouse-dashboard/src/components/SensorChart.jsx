@@ -39,7 +39,7 @@ function SensorChart() {
 
   useEffect(() => {
     setLoading(true);
-    webSocketService.socket.emit('sensor:history', { limit: 2000 });
+  webSocketService.emitToServer('sensor:history', { limit: 2000 });
     const unsubscribe = webSocketService.on('sensor:history', (response) => {
       if (response.success && response.data) {
         const now = Date.now();
@@ -72,7 +72,7 @@ function SensorChart() {
   useEffect(() => {
     const refreshInterval = timeRange === '1h' ? 30000 : 60000;
     const interval = setInterval(() => {
-      webSocketService.socket.emit('sensor:history', { limit: 2000 });
+      webSocketService.emitToServer('sensor:history', { limit: 2000 });
     }, refreshInterval);
     return () => clearInterval(interval);
   }, [timeRange]);

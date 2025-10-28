@@ -42,7 +42,7 @@ function LogViewer() {
   // Refresca los logs manualmente
   const fetchLogs = () => {
     setLoading(true);
-    webSocketService.socket.emit('log:list', {
+  webSocketService.emitToServer('log:list', {
       limit: 50,
       level: filterLevel === 'all' ? undefined : filterLevel,
       source: filterSource === 'all' ? undefined : filterSource
@@ -57,7 +57,7 @@ function LogViewer() {
 
   useEffect(() => {
     setLoading(true);
-    webSocketService.socket.emit('log:list', {
+  webSocketService.emitToServer('log:list', {
       limit: 50,
       level: filterLevel === 'all' ? undefined : filterLevel,
       source: filterSource === 'all' ? undefined : filterSource
@@ -69,7 +69,7 @@ function LogViewer() {
       setLoading(false);
     });
     const interval = setInterval(() => {
-      webSocketService.socket.emit('log:list', {
+      webSocketService.emitToServer('log:list', {
         limit: 50,
         level: filterLevel === 'all' ? undefined : filterLevel,
         source: filterSource === 'all' ? undefined : filterSource

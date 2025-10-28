@@ -78,7 +78,7 @@ function RuleManager() {
 
   useEffect(() => {
     setLoading(true);
-    webSocketService.socket.emit('rule:list');
+  webSocketService.emitToServer('rule:list');
     const unsubscribe = webSocketService.on('rule:list', (response) => {
       if (response.success) {
         setRules(response.data);
@@ -118,20 +118,20 @@ function RuleManager() {
   const handleSaveRule = () => {
     setLoading(true);
     if (editingRule) {
-      webSocketService.socket.emit('rule:update', { ruleId: editingRule._id, ruleData: newRule });
+      webSocketService.emitToServer('rule:update', { ruleId: editingRule._id, ruleData: newRule });
       const unsubscribe = webSocketService.on('rule:updated', (response) => {
         if (response.success) {
-          webSocketService.socket.emit('rule:list');
+          webSocketService.emitToServer('rule:list');
         }
         setLoading(false);
         handleCloseDialog();
         unsubscribe();
       });
     } else {
-      webSocketService.socket.emit('rule:create', newRule);
+      webSocketService.emitToServer('rule:create', newRule);
       const unsubscribe = webSocketService.on('rule:created', (response) => {
         if (response.success) {
-          webSocketService.socket.emit('rule:list');
+          webSocketService.emitToServer('rule:list');
         }
         setLoading(false);
         handleCloseDialog();
@@ -142,10 +142,10 @@ function RuleManager() {
 
   const handleDeleteRule = (ruleId) => {
     setLoading(true);
-    webSocketService.socket.emit('rule:delete', { ruleId });
+  webSocketService.emitToServer('rule:delete', { ruleId });
     const unsubscribe = webSocketService.on('rule:deleted', (response) => {
       if (response.success) {
-        webSocketService.socket.emit('rule:list');
+  webSocketService.emitToServer('rule:list');
       }
       setLoading(false);
       unsubscribe();
