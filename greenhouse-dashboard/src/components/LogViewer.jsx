@@ -39,6 +39,15 @@ const LOG_LEVELS = {
 const LOG_SOURCES = ['all', 'esp32', 'api', 'system'];
 
 function LogViewer() {
+  // Refresca los logs manualmente
+  const fetchLogs = () => {
+    setLoading(true);
+    webSocketService.socket.emit('log:list', {
+      limit: 50,
+      level: filterLevel === 'all' ? undefined : filterLevel,
+      source: filterSource === 'all' ? undefined : filterSource
+    });
+  };
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

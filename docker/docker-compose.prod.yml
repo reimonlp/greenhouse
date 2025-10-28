@@ -57,6 +57,7 @@ services:
     # Montar directorio de logs para facilitar backup
     volumes:
       - ./logs/app:/app/backend/logs
+      - /home/rei/greenhouse/greenhouse-dashboard/dist:/app/frontend/dist
     
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
