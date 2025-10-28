@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Box, 
   Container, 
@@ -20,40 +20,16 @@ import RelayControl from './RelayControl';
 import RuleManager from './RuleManager';
 import SensorChart from './SensorChart';
 import LogViewer from './LogViewer';
-import webSocketService from '../services/websocket';
-import { useWebSocket, useSensorUpdates } from '../hooks/useWebSocket';
+import { useWebSocket, useSensorUpdates, useRelayUpdates, useStormEvent } from '../hooks/useWebSocket';
 
 function Dashboard() {
-  // Evento de tormenta por WebSocket
-  const { useStormEvent } = require('../hooks/useWebSocket');
-  const stormData = typeof useStormEvent === 'function' ? useStormEvent() : null;
-  const [sensorData, setSensorData] = useState(null);
-  const [relayStates, setRelayStates] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Conexión y datos por WebSocket hooks
+  const stormData = useStormEvent();
+  const sensorData = useSensorUpdates();
+  const relayStates = useRelayUpdates();
   const [error, setError] = useState(null);
   const [chartModalOpen, setChartModalOpen] = useState(false);
   const { isConnected } = useWebSocket();
-
-  useEffect(() => {
-    setLoading(true);
-    webSocketService.socket.emit('sensor:latest');
-    const unsubSensor = webSocketService.on('sensor:latest', (response) => {
-      if (response.success && response.data) {
-        setSensorData(response.data);
-      }
-      setLoading(false);
-    });
-    webSocketService.socket.emit('relay:states');
-    const unsubRelay = webSocketService.on('relay:states', (response) => {
-      if (response.success && response.data) {
-        setRelayStates(response.data);
-      }
-    });
-    return () => {
-      unsubSensor();
-      unsubRelay();
-    };
-  }, []);
 
   // Render principal
   return (
@@ -154,10 +130,7 @@ function Dashboard() {
           <Grid container spacing={2}>
             {relayStates.map((relay) => (
               <Grid item xs={12} sm={6} md={3} key={relay.relay_id}>
-                <RelayControl 
-                  relay={relay} 
-                  onToggle={handleRelayToggle}
-                />
+                <RelayControl relay={relay} />
               </Grid>
             ))}
           </Grid>

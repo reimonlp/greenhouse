@@ -25,6 +25,33 @@ function setupSocketHandlers(ioInstance, esp32Token, evaluateSensorRulesFn) {
       timestamp: new Date()
     });
 
+    // Evento: dashboard solicita todos los estados de relés
+    socket.on('relay:states', async () => {
+      try {
+        // Obtener el estado más reciente de cada relé
+        const states = await RelayState.aggregate([
+          { $sort: { relay_id: 1, timestamp: -1 } },
+          {
+            $group: {
+              _id: '$relay_id',
+              latestState: { $first: '$$ROOT' }
+            }
+          },
+          { $replaceRoot: { newRoot: '$latestState' } },
+          { $sort: { relay_id: 1 } }
+        ]);
+        socket.emit('relay:states', {
+          success: true,
+          data: states
+        });
+      } catch (error) {
+        socket.emit('relay:states', {
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
     // ====== ESP32 Device Events ======
 
     // Device registration with authentication

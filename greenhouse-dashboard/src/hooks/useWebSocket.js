@@ -54,6 +54,30 @@ export function useSensorUpdates() {
 export function useRelayUpdates() {
   const [relayStates, setRelayStates] = useState([]);
 
+  // Solicitar estado inicial al montar
+  useEffect(() => {
+    if (webSocketService.socket && webSocketService.socket.connected) {
+      webSocketService.socket.emit('relay:states');
+    } else {
+      // Si no está conectado aún, esperar a que conecte
+      const onConnect = () => {
+        webSocketService.socket.emit('relay:states');
+      };
+      webSocketService.socket?.on('connect', onConnect);
+      return () => {
+        webSocketService.socket?.off('connect', onConnect);
+      };
+    }
+  }, []);
+
+  // Actualizar con el array inicial
+  useWebSocketEvent('relay:states', (response) => {
+    if (response.success && Array.isArray(response.data)) {
+      setRelayStates(response.data);
+    }
+  });
+
+  // Actualizar con cambios individuales
   const handleRelayChange = useCallback((data) => {
     setRelayStates(prev => {
       const index = prev.findIndex(r => r.relay_id === data.relay_id);
