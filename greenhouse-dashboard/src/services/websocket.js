@@ -108,9 +108,16 @@ class WebSocketService {
     }
   }
 
+  // Emitir evento al servidor WebSocket
+  emitToServer(event, data) {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit(event, data);
+    }
+  }
+
+  // Emitir evento local (listeners internos)
   emit(event, data) {
     if (!this.listeners.has(event)) return;
-    
     this.listeners.get(event).forEach(callback => {
       try {
         callback(data);

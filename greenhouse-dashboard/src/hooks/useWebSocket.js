@@ -61,11 +61,11 @@ export function useRelayUpdates() {
   // Solicitar estado inicial al montar
   useEffect(() => {
     if (webSocketService.socket && webSocketService.socket.connected) {
-      webSocketService.socket.emit('relay:states');
+      webSocketService.emitToServer('relay:states');
     } else {
       // Si no está conectado aún, esperar a que conecte
       const onConnect = () => {
-        webSocketService.socket.emit('relay:states');
+        webSocketService.emitToServer('relay:states');
       };
       webSocketService.socket?.on('connect', onConnect);
       return () => {
