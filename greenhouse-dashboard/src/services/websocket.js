@@ -1,5 +1,4 @@
 import { io } from 'socket.io-client';
-import API_BASE_URL from '../config/api';
 
 class WebSocketService {
   constructor() {
@@ -15,15 +14,13 @@ class WebSocketService {
       return;
     }
 
-    // Socket.IO debe conectarse al servidor con el path correcto
-    // API_BASE_URL es https://reimon.dev/greenhouse
-    // Necesitamos conectar a https://reimon.dev con path /greenhouse/socket.io/
-    const serverUrl = API_BASE_URL.replace('/greenhouse', '');
+  // Configura la URL del servidor WebSocket aquí:
+  const serverUrl = import.meta.env.VITE_WS_URL || 'https://reimon.dev';
     
     // Silent connection - no log noise
     
     this.socket = io(serverUrl, {
-      path: '/greenhouse/socket.io/',
+  path: '/greenhouse/socket.io/',
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
