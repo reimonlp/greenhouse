@@ -21,7 +21,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { useEffect, useState } from 'react';
+// import duplicada eliminada
 import webSocketService from '../services/websocket';
 
 const TIME_RANGES = {
