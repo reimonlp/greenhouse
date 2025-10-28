@@ -19,7 +19,6 @@ export default defineConfig({
             if (id.includes('react')) return 'react';
             if (id.includes('recharts')) return 'recharts';
             if (id.includes('mui')) return 'mui';
-            if (id.includes('socket.io-client')) return 'socketio';
             return 'vendor';
           }
         }
