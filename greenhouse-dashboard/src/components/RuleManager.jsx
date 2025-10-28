@@ -33,6 +33,26 @@ const OPERATORS = ['>', '<', '>=', '<=', '==', '!='];
 const DAYS_OF_WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 function RuleManager() {
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setEditingRule(null);
+    setNewRule({
+      name: '',
+      relay_id: 0,
+      enabled: true,
+      rule_type: 'sensor',
+      condition: {
+        sensor: 'temperature',
+        operator: '>',
+        threshold: 25
+      },
+      schedule: {
+        time: '06:00',
+        days: [0, 1, 2, 3, 4, 5, 6]
+      },
+      action: 'on'
+    });
+  };
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
