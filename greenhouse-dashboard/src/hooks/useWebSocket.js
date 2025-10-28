@@ -34,7 +34,11 @@ export function useWebSocket() {
 
 export function useWebSocketEvent(event, callback) {
   useEffect(() => {
-    const unsubscribe = webSocketService.on(event, callback);
+    const wrappedCallback = (...args) => {
+      console.log(`[WS] Evento recibido: ${event}`, ...args);
+      callback(...args);
+    };
+    const unsubscribe = webSocketService.on(event, wrappedCallback);
     return unsubscribe;
   }, [event, callback]);
 }
@@ -72,8 +76,11 @@ export function useRelayUpdates() {
 
   // Actualizar con el array inicial
   useWebSocketEvent('relay:states', (response) => {
+    console.log('[WS] Evento relay:states', response);
     if (response.success && Array.isArray(response.data)) {
       setRelayStates(response.data);
+    } else {
+      console.warn('[WS] relay:states error o datos vacíos', response);
     }
   });
 
@@ -90,7 +97,10 @@ export function useRelayUpdates() {
     });
   }, []);
 
-  useWebSocketEvent('relay:changed', handleRelayChange);
+  useWebSocketEvent('relay:changed', (data) => {
+    console.log('[WS] Evento relay:changed', data);
+    handleRelayChange(data);
+  });
 
   return relayStates;
 }
