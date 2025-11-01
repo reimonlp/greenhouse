@@ -3,7 +3,7 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
-const RelayState = require('../backend-websocket-update/models/RelayState');
+const RelayState = require('../backend/models/RelayState');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/greenhouse';
 

@@ -40,7 +40,7 @@ Backend → Frontend (WEBSOCKET ONLY):
 - **ESP32_AUTH_TOKEN**: 32+ char Bearer token (must be identical in `secrets.h` and backend `.env`)
 - Generate: `openssl rand -hex 32`
 - **Never commit**: `.env`, `.env.production`, `secrets.h` (use `.example.h` templates)
-- Validation in `backend-websocket-update/server.js` (fatal error if missing or <32 chars)
+- Validation in `backend/server.js` (fatal error if missing or <32 chars)
 
 ### WebSocket Rate Limiting
 - **Limit**: 120 events/minute per socket (in `middleware/rateLimiter.js`)
@@ -100,14 +100,14 @@ Backend → Frontend (WEBSOCKET ONLY):
 - Key headers: `config.h` (debug mode, timeouts), `vps_websocket.h` (connection logic)
 - **Note**: All sensor/relay communication via WebSocket `sensor:data`, `relay:state` events
 
-**Backend Development** (`backend-websocket-update/`):
+**Backend Development** (`backend/`):
 - Start: `npm start` (reads `.env`, validates ESP32_AUTH_TOKEN)
 - Health check: `curl http://localhost:3000/health`
 - WebSocket handlers: `sockets/socketHandlers.js` (all 8+ event handlers)
 - API routes: `routes/api.js` (error handler only; all business logic in WebSocket)
 - Logs: `docker compose logs -f app` (for container env)
 
-**Frontend Development** (`greenhouse-dashboard/`):
+**Frontend Development** (`frontend/`):
 - Dev server: `npm run dev` (port 5173, connects to localhost:3000)
 - Build: `npm run build` → `dist/` (served by Nginx in production)
 - WebSocket service: `src/services/websocket.js` (connects to `https://reimon.dev` in prod)
@@ -189,8 +189,8 @@ Backend → Frontend (WEBSOCKET ONLY):
 - **`DEPLOYMENT_SUMMARY.md`**: Deployment phases, checklist, SSL/Nginx setup
 - **`docker/README.md`**: Quick start, troubleshooting, environment setup
 - **`esp32-firmware/include/config.h`**: Central firmware config (debug, timings, sensor sensitivity)
-- **`backend-websocket-update/sockets/socketHandlers.js`**: All WebSocket event handlers (8+)
-- **`greenhouse-dashboard/src/hooks/useWebSocket.js`**: Frontend real-time data subscriptions
+- **`backend/sockets/socketHandlers.js`**: All WebSocket event handlers (8+)
+- **`frontend/src/hooks/useWebSocket.js`**: Frontend real-time data subscriptions
 
 ## Example: Test WebSocket Sensor Data Reception
 

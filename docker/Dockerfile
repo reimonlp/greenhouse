@@ -3,13 +3,13 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Copy frontend package files
-#COPY greenhouse-dashboard/package*.json ./
+#COPY frontend/package*.json ./
 
 # Install dependencies
 #RUN npm ci --prefer-offline --no-audit
 
 # Copy frontend source
-#COPY greenhouse-dashboard/ ./
+#COPY frontend/ ./
 
 # Build frontend
 #RUN npm run build
@@ -25,8 +25,8 @@ WORKDIR /app/backend
 
 # Los archivos del backend y el build del frontend se montan como volúmenes desde el host
 # Ejemplo en docker-compose:
-#   - ./backend-websocket-update:/app/backend
-#   - ./greenhouse-dashboard/dist:/app/frontend/dist
+#   - ./backend:/app/backend
+#   - ./frontend/dist:/app/frontend/dist
 
 # Healthcheck para Express
 RUN echo '#!/bin/sh' > /healthcheck.sh && \

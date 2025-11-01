@@ -85,7 +85,7 @@ setupHealthCheck(app, io, socketRateLimits);
 // ====== Static Frontend Files ======
 // Serve static files from the frontend build directory
 const path = require('path');
-const frontendPath = path.join(__dirname, '../greenhouse-dashboard/dist');
+const frontendPath = path.join(__dirname, '../frontend/dist');
 
 // Serve static files (CSS, JS, images, etc.)
 app.use('/assets', express.static(path.join(frontendPath, 'assets')));

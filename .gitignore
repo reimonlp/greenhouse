@@ -9,14 +9,14 @@ include/secrets.h
 
 # Node.js dependencies
 node_modules/
-greenhouse-dashboard/node_modules/
+frontend/node_modules/
 
 # mongodb-backend (código muerto - ignorar completamente)
 mongodb-backend/
 
 # Build outputs
-greenhouse-dashboard/dist/
-greenhouse-dashboard/build/
+frontend/dist/
+frontend/build/
 
 # Logs
 *.log
@@ -33,7 +33,7 @@ yarn-error.log*
 docker/.env
 docker/.env.local
 docker/.env.production
-backend-websocket-update/.env
+backend/.env
 
 # Docker
 docker/config/secrets/
