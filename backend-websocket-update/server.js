@@ -85,7 +85,7 @@ setupHealthCheck(app, io, socketRateLimits);
 // ====== Static Frontend Files ======
 // Serve static files from the frontend build directory
 const path = require('path');
-const frontendPath = path.join(__dirname, '../frontend/dist');
+const frontendPath = path.join(__dirname, '../greenhouse-dashboard/dist');
 
 // Serve static files (CSS, JS, images, etc.)
 app.use('/assets', express.static(path.join(frontendPath, 'assets')));
@@ -93,8 +93,8 @@ app.use('/favicon.svg', express.static(path.join(frontendPath, 'favicon.svg')));
 
 // Serve the main React app for all non-API routes
 app.get('*', (req, res, next) => {
-  // Skip API routes and health check
-  if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/') || req.path === '/health') {
+  // Skip health check
+  if (req.path.startsWith('/socket.io/') || req.path === '/health') {
     return next();
   }
   

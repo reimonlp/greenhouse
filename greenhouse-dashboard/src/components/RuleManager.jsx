@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useRules } from '../hooks/useWebSocket';
 import webSocketService from '../services/websocket';
 import {
   Box,
@@ -24,7 +25,8 @@ import {
   Switch,
   FormControlLabel,
   Alert,
-  Chip
+  Chip,
+  CircularProgress
 } from '@mui/material';
 import { Delete, Add, Edit } from '@mui/icons-material';
 
@@ -33,29 +35,9 @@ const OPERATORS = ['>', '<', '>=', '<=', '==', '!='];
 const DAYS_OF_WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 function RuleManager() {
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setEditingRule(null);
-    setNewRule({
-      name: '',
-      relay_id: 0,
-      enabled: true,
-      rule_type: 'sensor',
-      condition: {
-        sensor: 'temperature',
-        operator: '>',
-        threshold: 25
-      },
-      schedule: {
-        time: '06:00',
-        days: [0, 1, 2, 3, 4, 5, 6]
-      },
-      action: 'on'
-    });
-  };
-  const [rules, setRules] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Use the modern hook
+  const { rules, loading, error } = useRules();
+  
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [ruleType, setRuleType] = useState('sensor');
@@ -76,17 +58,26 @@ function RuleManager() {
     action: 'on'
   });
 
-  useEffect(() => {
-    setLoading(true);
-  webSocketService.emitToServer('rule:list');
-    const unsubscribe = webSocketService.on('rule:list', (response) => {
-      if (response.success) {
-        setRules(response.data);
-      }
-      setLoading(false);
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setEditingRule(null);
+    setNewRule({
+      name: '',
+      relay_id: 0,
+      enabled: true,
+      rule_type: 'sensor',
+      condition: {
+        sensor: 'temperature',
+        operator: '>',
+        threshold: 25
+      },
+      schedule: {
+        time: '06:00',
+        days: [0, 1, 2, 3, 4, 5, 6]
+      },
+      action: 'on'
     });
-    return () => unsubscribe();
-  }, []);
+  };
 
   const handleOpenDialog = () => {
     setEditingRule(null);
@@ -113,43 +104,22 @@ function RuleManager() {
       },
       action: rule.action || 'on'
     });
+    setOpenDialog(true);
   };
 
   const handleSaveRule = () => {
-    setLoading(true);
     if (editingRule) {
-      webSocketService.emitToServer('rule:update', { ruleId: editingRule._id, ruleData: newRule });
-      const unsubscribe = webSocketService.on('rule:updated', (response) => {
-        if (response.success) {
-          webSocketService.emitToServer('rule:list');
-        }
-        setLoading(false);
-        handleCloseDialog();
-        unsubscribe();
-      });
+      webSocketService.updateRule(editingRule._id, newRule);
     } else {
-      webSocketService.emitToServer('rule:create', newRule);
-      const unsubscribe = webSocketService.on('rule:created', (response) => {
-        if (response.success) {
-          webSocketService.emitToServer('rule:list');
-        }
-        setLoading(false);
-        handleCloseDialog();
-        unsubscribe();
-      });
+      webSocketService.createRule(newRule);
     }
+    handleCloseDialog();
   };
 
   const handleDeleteRule = (ruleId) => {
-    setLoading(true);
-  webSocketService.emitToServer('rule:delete', { ruleId });
-    const unsubscribe = webSocketService.on('rule:deleted', (response) => {
-      if (response.success) {
-  webSocketService.emitToServer('rule:list');
-      }
-      setLoading(false);
-      unsubscribe();
-    });
+    if (confirm('¿Seguro que deseas eliminar esta regla?')) {
+      webSocketService.deleteRule(ruleId);
+    }
   };
 
   const getSensorLabel = (sensor) => {
@@ -172,6 +142,7 @@ function RuleManager() {
           color="primary"
           startIcon={<Add />}
           onClick={handleOpenDialog}
+          disabled={loading}
         >
           Nueva Regla
         </Button>
@@ -196,7 +167,13 @@ function RuleManager() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rules.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  <CircularProgress size={40} sx={{ my: 2 }} />
+                </TableCell>
+              </TableRow>
+            ) : rules.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   <Typography color="text.secondary">
@@ -422,4 +399,5 @@ function RuleManager() {
     </Paper>
   );
 }
+
 export default RuleManager;

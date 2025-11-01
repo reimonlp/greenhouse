@@ -55,17 +55,51 @@ export function useSensorUpdates() {
   return latestSensor;
 }
 
+export function useSensorHistory(limit = 100, startDate = null, endDate = null) {
+  const [sensorHistory, setSensorHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchHistory = useCallback(() => {
+    setLoading(true);
+    webSocketService.fetchSensorHistory(limit, startDate, endDate);
+  }, [limit, startDate, endDate]);
+
+  useEffect(() => {
+    const unsubscribe = webSocketService.on('sensor:history', (response) => {
+      if (response.success) {
+        setSensorHistory(response.data);
+        setError(null);
+      } else {
+        setError(response.error);
+      }
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return { sensorHistory, loading, error, fetchHistory };
+}
+
 export function useRelayUpdates() {
   const [relayStates, setRelayStates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Solicitar estado inicial al montar
   useEffect(() => {
-    if (webSocketService.socket && webSocketService.socket.connected) {
-      webSocketService.emitToServer('relay:states');
+    const requestRelayStates = () => {
+      setLoading(true);
+      webSocketService.fetchRelayStates();
+    };
+
+    if (webSocketService.socket?.connected) {
+      requestRelayStates();
     } else {
       // Si no está conectado aún, esperar a que conecte
       const onConnect = () => {
-        webSocketService.emitToServer('relay:states');
+        requestRelayStates();
       };
       webSocketService.socket?.on('connect', onConnect);
       return () => {
@@ -74,33 +108,126 @@ export function useRelayUpdates() {
     }
   }, []);
 
-  // Actualizar con el array inicial
-  useWebSocketEvent('relay:states', (response) => {
-    console.log('[WS] Evento relay:states', response);
-    if (response.success && Array.isArray(response.data)) {
-      setRelayStates(response.data);
-    } else {
-      console.warn('[WS] relay:states error o datos vacíos', response);
-    }
-  });
-
-  // Actualizar con cambios individuales
-  const handleRelayChange = useCallback((data) => {
-    setRelayStates(prev => {
-      const index = prev.findIndex(r => r.relay_id === data.relay_id);
-      if (index >= 0) {
-        const updated = [...prev];
-        updated[index] = data;
-        return updated;
+  // Listener para relay:states response
+  useEffect(() => {
+    const unsubscribe = webSocketService.on('relay:states', (response) => {
+      console.log('[WS] Evento relay:states recibido:', response);
+      if (response.success && Array.isArray(response.data)) {
+        // Ordenar por relay_id para consistencia
+        const sorted = response.data.sort((a, b) => a.relay_id - b.relay_id);
+        setRelayStates(sorted);
+        setError(null);
+      } else {
+        console.warn('[WS] relay:states error:', response.error);
+        setError(response.error || 'Error al cargar estados de relés');
       }
-      return [...prev, data];
+      setLoading(false);
     });
+
+    return unsubscribe;
   }, []);
 
-  useWebSocketEvent('relay:changed', (data) => {
-    console.log('[WS] Evento relay:changed', data);
-    handleRelayChange(data);
-  });
+  // Listener para cambios individuales de relés
+  useEffect(() => {
+    const unsubscribe = webSocketService.on('relay:changed', (data) => {
+      console.log('[WS] Evento relay:changed recibido:', data);
+      setRelayStates(prev => {
+        const index = prev.findIndex(r => r.relay_id === data.relay_id);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = data;
+          return updated;
+        }
+        // Si no existe, agregarlo
+        return [...prev, data].sort((a, b) => a.relay_id - b.relay_id);
+      });
+    });
 
-  return relayStates;
+    return unsubscribe;
+  }, []);
+
+  return { relayStates, loading, error };
+}
+
+export function useRules() {
+  const [rules, setRules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchRules = useCallback(() => {
+    setLoading(true);
+    webSocketService.fetchRules();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeList = webSocketService.on('rule:list', (response) => {
+      if (response.success) {
+        setRules(response.data);
+        setError(null);
+      } else {
+        setError(response.error);
+      }
+      setLoading(false);
+    });
+
+    const unsubscribeCreated = webSocketService.on('rule:created', (response) => {
+      if (response.success) {
+        setRules(prev => [...prev, response.data]);
+      }
+    });
+
+    const unsubscribeUpdated = webSocketService.on('rule:updated', (response) => {
+      if (response.success) {
+        setRules(prev => prev.map(r => r._id === response.data._id ? response.data : r));
+      }
+    });
+
+    const unsubscribeDeleted = webSocketService.on('rule:deleted', (response) => {
+      if (response.success) {
+        setRules(prev => prev.filter(r => r._id !== response.data.id));
+      }
+    });
+
+    // Initial fetch on mount
+    fetchRules();
+
+    return () => {
+      unsubscribeList();
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+    };
+  }, [fetchRules]);
+
+  return { rules, loading, error, fetchRules };
+}
+
+export function useLogs(limit = 50, level = null, source = null) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchLogs = useCallback(() => {
+    setLoading(true);
+    webSocketService.fetchLogs(limit, level, source);
+  }, [limit, level, source]);
+
+  useEffect(() => {
+    const unsubscribe = webSocketService.on('log:list', (response) => {
+      if (response.success) {
+        setLogs(response.data);
+        setError(null);
+      } else {
+        setError(response.error);
+      }
+      setLoading(false);
+    });
+
+    // Initial fetch on mount
+    fetchLogs();
+
+    return unsubscribe;
+  }, [fetchLogs]);
+
+  return { logs, loading, error, fetchLogs };
 }

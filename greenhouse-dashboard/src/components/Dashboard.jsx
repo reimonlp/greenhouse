@@ -27,7 +27,7 @@ function Dashboard() {
   // Conexión y datos por WebSocket hooks
   const stormData = useStormEvent();
   const sensorData = useSensorUpdates();
-  const relayStates = useRelayUpdates();
+  const { relayStates, loading: relaysLoading, error: relaysError } = useRelayUpdates();
   const [error, setError] = useState(null);
   const [chartModalOpen, setChartModalOpen] = useState(false);
   const { isConnected } = useWebSocket();
@@ -128,13 +128,30 @@ function Dashboard() {
           <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
             Control de Relés
           </Typography>
-          <Grid container spacing={2}>
-            {relayStates.map((relay) => (
-              <Grid item xs={12} sm={6} md={3} key={relay.relay_id}>
-                <RelayControl relay={relay} />
-              </Grid>
-            ))}
-          </Grid>
+          
+          {relaysError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Error al cargar relés: {relaysError}
+            </Alert>
+          )}
+
+          {relaysLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : relayStates.length === 0 ? (
+            <Typography color="text.secondary" sx={{ textAlign: 'center', p: 2 }}>
+              No hay relés disponibles. Verifica la conexión del ESP32.
+            </Typography>
+          ) : (
+            <Grid container spacing={2}>
+              {relayStates.map((relay) => (
+                <Grid item xs={12} sm={6} md={3} key={relay.relay_id}>
+                  <RelayControl relay={relay} />
+                </Grid>
+              ))}
+            </Grid>
+          )}
         </Paper>
 
 // Eliminar fragmentos sueltos fuera del return principal

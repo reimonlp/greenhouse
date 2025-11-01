@@ -14,9 +14,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  TextField,
   IconButton,
-  Collapse
+  Collapse,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { 
   Info, 
@@ -27,7 +28,7 @@ import {
   ExpandMore,
   ExpandLess
 } from '@mui/icons-material';
-import webSocketService from '../services/websocket';
+import { useLogs } from '../hooks/useWebSocket';
 
 const LOG_LEVELS = {
   info: { color: 'info', icon: <Info fontSize="small" /> },
@@ -36,50 +37,25 @@ const LOG_LEVELS = {
   debug: { color: 'default', icon: <BugReport fontSize="small" /> }
 };
 
-const LOG_SOURCES = ['all', 'esp32', 'api', 'system'];
-
 function LogViewer() {
-  // Refresca los logs manualmente
-  const fetchLogs = () => {
-    setLoading(true);
-  webSocketService.emitToServer('log:list', {
-      limit: 50,
-      level: filterLevel === 'all' ? undefined : filterLevel,
-      source: filterSource === 'all' ? undefined : filterSource
-    });
-  };
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [filterLevel, setFilterLevel] = useState('all');
   const [filterSource, setFilterSource] = useState('all');
   const [expandedRows, setExpandedRows] = useState({});
+  
+  // Use the modern hook
+  const { logs, loading, error, fetchLogs } = useLogs(
+    50,
+    filterLevel === 'all' ? null : filterLevel,
+    filterSource === 'all' ? null : filterSource
+  );
 
+  // Auto-refresh logs every 10 seconds
   useEffect(() => {
-    setLoading(true);
-  webSocketService.emitToServer('log:list', {
-      limit: 50,
-      level: filterLevel === 'all' ? undefined : filterLevel,
-      source: filterSource === 'all' ? undefined : filterSource
-    });
-    const unsubscribe = webSocketService.on('log:list', (response) => {
-      if (response.success) {
-        setLogs(response.data);
-      }
-      setLoading(false);
-    });
     const interval = setInterval(() => {
-      webSocketService.emitToServer('log:list', {
-        limit: 50,
-        level: filterLevel === 'all' ? undefined : filterLevel,
-        source: filterSource === 'all' ? undefined : filterSource
-      });
+      fetchLogs();
     }, 10000);
-    return () => {
-      clearInterval(interval);
-      unsubscribe();
-    };
-  }, [filterLevel, filterSource]);
+    return () => clearInterval(interval);
+  }, [fetchLogs]);
 
   const handleToggleRow = (logId) => {
     setExpandedRows(prev => ({
@@ -136,11 +112,21 @@ function LogViewer() {
             </Select>
           </FormControl>
 
-          <IconButton onClick={fetchLogs} color="primary">
-            <Refresh />
+          <IconButton 
+            onClick={fetchLogs} 
+            color="primary"
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : <Refresh />}
           </IconButton>
         </Box>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Error al cargar logs: {error}
+        </Alert>
+      )}
 
       <TableContainer sx={{ maxHeight: 500 }}>
         <Table stickyHeader size="small">
@@ -154,7 +140,14 @@ function LogViewer() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {logs.length === 0 ? (
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  <CircularProgress size={40} sx={{ my: 2 }} />
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading && logs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center">
                   <Typography color="text.secondary">
@@ -168,9 +161,8 @@ function LogViewer() {
                 const isExpanded = expandedRows[log._id];
                 
                 return (
-                  <>
+                  <div key={log._id}>
                     <TableRow 
-                      key={log._id}
                       hover
                       sx={{ cursor: log.metadata ? 'pointer' : 'default' }}
                       onClick={() => log.metadata && handleToggleRow(log._id)}
@@ -193,7 +185,7 @@ function LogViewer() {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={log.source}
+                          label={log.metadata?.source || 'system'}
                           size="small"
                           variant="outlined"
                         />
@@ -233,7 +225,7 @@ function LogViewer() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </div>
                 );
               })
             )}
