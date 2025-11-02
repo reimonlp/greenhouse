@@ -27,12 +27,10 @@ services:
       - "com.greenhouse.environment=production"
 
   app:
-    # Opción 1: Usar imagen pusheada a DockerHub
-    # image: ${DOCKER_IMAGE:-local/greenhouse:latest}
-    # Opción 2: Build local si está disponible
+    # Build usando Dockerfile.prod
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.prod
     
     container_name: greenhouse-app
     depends_on:
@@ -54,10 +52,9 @@ services:
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-5000}
       - LOG_LEVEL=info
     
-    # Montar directorio de logs para facilitar backup
+    # Solo montar logs (el código ya está en la imagen)
     volumes:
       - ./logs/app:/app/backend/logs
-      - /home/rei/greenhouse/frontend/dist:/app/frontend/dist
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]

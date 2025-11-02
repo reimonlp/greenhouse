@@ -116,7 +116,7 @@ jobs:
               HEALTH_OK=false
               
               while [ $RETRY -lt $MAX_RETRIES ]; do
-                if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
+                if curl -sf https://reimon.dev/greenhouse/health > /dev/null 2>&1; then
                   echo "✅ Backend health check PASSED"
                   HEALTH_OK=true
                   break
