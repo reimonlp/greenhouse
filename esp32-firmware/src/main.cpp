@@ -9,7 +9,7 @@
 #include "vps_config.h"
 #include "vps_client.h"
 #include "vps_websocket.h"
-#include "vps_ota.h"
+#include "ota.h"
 #include "sensors.h"
 #include "relays.h"
 #include "secrets.h"

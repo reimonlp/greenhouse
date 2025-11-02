@@ -1,5 +1,5 @@
-#ifndef VPS_OTA_H
-#define VPS_OTA_H
+#ifndef OTA_H
+#define OTA_H
 
 // OTA Configuration
 #define OTA_ENABLED 1
