@@ -1,5 +1,5 @@
 /**
- * Frontend Routes
+ * Frontend Route Handler
  * Serves React app and static assets
  */
 

@@ -3,7 +3,7 @@ const express = require('express');
 
 // Import modules
 const { setupCorsAndSecurity } = require('./middleware/cors-security');
-const { setupFrontendRoutes } = require('./middleware/frontend-routes');
+const { setupFrontendRoutes } = require('./handlers/frontend');
 const { createServer, setupSocketIO, startServer, setupGracefulShutdown } = require('./lib/server-setup');
 const { checkSocketRateLimit, socketRateLimits } = require('./middleware/rateLimiter');
 const { setupSocketHandlers } = require('./sockets/socketHandlers');
