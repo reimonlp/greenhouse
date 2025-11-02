@@ -33,19 +33,25 @@ jobs:
               echo "Proyecto: $PROJECT_DIR"
               echo ""
               
+              # Asegurar permisos correctos en el directorio del proyecto
+              chmod -R u+w "$PROJECT_DIR" 2>/dev/null || true
+              
               # 0. Crear archivos .env desde GitHub Secrets
               echo "🔐 Paso 0: Configurando variables de entorno..."
               
-              # Crear .env.production en raíz
+              # Crear .env.production en raíz (con permisos correctos)
               echo '${{ secrets.ENV_PRODUCTION }}' > "$PROJECT_DIR/.env.production"
+              chmod 600 "$PROJECT_DIR/.env.production"
               
               # Crear backend/.env (mismo contenido)
               mkdir -p "$PROJECT_DIR/backend"
               cp "$PROJECT_DIR/.env.production" "$PROJECT_DIR/backend/.env"
+              chmod 600 "$PROJECT_DIR/backend/.env"
               
               # Crear docker/.env.production (mismo contenido)
               mkdir -p "$PROJECT_DIR/docker"
               cp "$PROJECT_DIR/.env.production" "$PROJECT_DIR/docker/.env.production"
+              chmod 600 "$PROJECT_DIR/docker/.env.production"
               
               # Preservar token ESP32 en secrets.h si existe
               if grep -q "ESP32_AUTH_TOKEN" "$PROJECT_DIR/esp32-firmware/include/secrets.h" 2>/dev/null; then
