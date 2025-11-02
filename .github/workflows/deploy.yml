@@ -92,8 +92,17 @@ jobs:
               echo "✅ Configuración validada"
               echo ""
               
-              # 4. Reemplazar proyecto actual
-              echo "🔄 Paso 4: Activando nuevo código..."
+              # 4. Build frontend
+              echo "📦 Paso 4: Construyendo frontend..."
+              cd "$PROJECT_TMP/frontend"
+              npm ci --prefer-offline --no-audit
+              NODE_ENV=production npm run build
+              echo "✅ Frontend construido exitosamente"
+              cd "$PROJECT_TMP"
+              echo ""
+              
+              # 5. Reemplazar proyecto actual
+              echo "🔄 Paso 5: Activando nuevo código..."
               
               # Limpiar directorio anterior si existe
               if [ -d "$PROJECT_DIR.old" ]; then
@@ -111,8 +120,8 @@ jobs:
               echo "✅ Código actualizado"
               echo ""
               
-              # 5. Reiniciar backend
-              echo "🔄 Paso 5: Construyendo e iniciando backend..."
+              # 6. Reiniciar backend
+              echo "🔄 Paso 6: Construyendo e iniciando backend..."
               
               # Build Docker image
               echo "   Building Docker image..."
@@ -124,8 +133,8 @@ jobs:
               echo "✅ Backend iniciado"
               echo ""
               
-              # 6. Health checks (con reintentos)
-              echo "🏥 Paso 6: Verificando salud de servicios..."
+              # 7. Health checks (con reintentos)
+              echo "🏥 Paso 7: Verificando salud de servicios..."
               sleep 20  # Wait longer for backend to fully start and MongoDB to be ready
               MAX_RETRIES=5
               RETRY=0
@@ -170,13 +179,13 @@ jobs:
               fi
               echo ""
               
-              # 7. Limpiar
-              echo "🧹 Paso 7: Limpiando..."
+              # 8. Limpiar
+              echo "🧹 Paso 8: Limpiando..."
               sudo rm -rf "$PROJECT_DIR.old"
               echo "✅ Limpieza completada"
               echo ""
               
-              # 8. Resumen final
+              # 9. Resumen final
               echo "✨ ===== DEPLOYMENT COMPLETADO ====="
               echo "Estado: EXITOSO"
               echo "Servicios activos:"
