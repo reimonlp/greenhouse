@@ -23,14 +23,50 @@ jobs:
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             DEPLOY_LOG="/tmp/deploy_${TIMESTAMP}.log"
             
+            # Preservar archivos sensibles
+            ENV_BACKUP_DIR="/tmp/env_backup_${TIMESTAMP}"
+            mkdir -p "$ENV_BACKUP_DIR"
+            
             {
               echo "🚀 ===== DEPLOYMENT INICIADO ====="
               echo "Timestamp: $TIMESTAMP"
               echo "Proyecto: $PROJECT_DIR"
               echo ""
               
+              # 0. Crear archivos .env desde GitHub Secrets
+              echo "🔐 Paso 0: Configurando variables de entorno..."
+              
+              # Crear .env.production en raíz
+              cat > "$PROJECT_DIR/.env.production" <<EOF
+${{ secrets.ENV_PRODUCTION }}
+EOF
+              
+              # Crear backend/.env (mismo contenido)
+              mkdir -p "$PROJECT_DIR/backend"
+              cp "$PROJECT_DIR/.env.production" "$PROJECT_DIR/backend/.env"
+              
+              # Crear docker/.env.production (mismo contenido)
+              mkdir -p "$PROJECT_DIR/docker"
+              cp "$PROJECT_DIR/.env.production" "$PROJECT_DIR/docker/.env.production"
+              
+              # Preservar token ESP32 en secrets.h si existe
+              if grep -q "ESP32_AUTH_TOKEN" "$PROJECT_DIR/esp32-firmware/include/secrets.h" 2>/dev/null; then
+                echo "   ℹ️  ESP32 secrets.h preservado"
+              fi
+              
+              echo "✅ Variables de entorno configuradas"
+              echo ""
+              
               # 1. Crear backup del estado actual (excluyendo node_modules, dist, logs)
               echo "📦 Paso 1: Creando backup..."
+              
+              # Preservar archivos .env y secrets
+              echo "   Preservando archivos de configuración..."
+              [ -f "$PROJECT_DIR/.env.production" ] && cp "$PROJECT_DIR/.env.production" "$ENV_BACKUP_DIR/"
+              [ -f "$PROJECT_DIR/backend/.env" ] && cp "$PROJECT_DIR/backend/.env" "$ENV_BACKUP_DIR/"
+              [ -f "$PROJECT_DIR/docker/.env.production" ] && cp "$PROJECT_DIR/docker/.env.production" "$ENV_BACKUP_DIR/"
+              [ -f "$PROJECT_DIR/esp32-firmware/include/secrets.h" ] && cp "$PROJECT_DIR/esp32-firmware/include/secrets.h" "$ENV_BACKUP_DIR/"
+              
               if [ -d "$BACKUP_DIR" ]; then
                 rm -rf "$BACKUP_DIR"
               fi
@@ -55,19 +91,19 @@ jobs:
               
               # 3. Validar configuración Docker
               echo "🔍 Paso 3: Validando docker-compose.prod.yml..."
-              docker compose -f docker-compose.prod.yml config > /dev/null
+              docker compose -f docker/docker-compose.prod.yml config > /dev/null
               echo "✅ Configuración validada"
               echo ""
               
               # 4. Reiniciar backend (sin MongoDB)
               echo "🔄 Paso 4: Reiniciando backend..."
-              docker compose -f docker-compose.prod.yml up -d app 2>&1 | tee -a "$DEPLOY_LOG"
+              docker compose -f docker/docker-compose.prod.yml up -d app 2>&1 | tee -a "$DEPLOY_LOG"
               echo "✅ Backend reiniciado"
               echo ""
               
               # 5. Reiniciar frontend (Nginx)
               echo "🔄 Paso 5: Reiniciando frontend (Nginx)..."
-              docker compose -f docker-compose.prod.yml up -d web 2>&1 | tee -a "$DEPLOY_LOG"
+              docker compose -f docker/docker-compose.prod.yml up -d web 2>&1 | tee -a "$DEPLOY_LOG"
               echo "✅ Frontend reiniciado"
               echo ""
               
@@ -102,9 +138,16 @@ jobs:
                 cp -r "$BACKUP_DIR" "$PROJECT_DIR"
                 cd "$PROJECT_DIR"
                 
+                # Restaurar archivos .env preservados
+                echo "   Restaurando configuración..."
+                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/" || true
+                [ -f "$ENV_BACKUP_DIR/.env" ] && cp "$ENV_BACKUP_DIR/.env" "$PROJECT_DIR/backend/" || true
+                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/docker/" || true
+                [ -f "$ENV_BACKUP_DIR/secrets.h" ] && cp "$ENV_BACKUP_DIR/secrets.h" "$PROJECT_DIR/esp32-firmware/include/" || true
+                
                 # Reiniciar con versión anterior
-                docker compose -f docker-compose.prod.yml down app web
-                docker compose -f docker-compose.prod.yml up -d app web
+                docker compose -f docker/docker-compose.prod.yml down app web
+                docker compose -f docker/docker-compose.prod.yml up -d app web
                 
                 sleep 5
                 if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
@@ -119,6 +162,7 @@ jobs:
               # 7. Limpiar backup si todo OK
               echo "🧹 Paso 7: Limpiando..."
               rm -rf "$BACKUP_DIR"
+              rm -rf "$ENV_BACKUP_DIR"
               echo "✅ Backup temporal eliminado"
               echo ""
               
@@ -126,7 +170,7 @@ jobs:
               echo "✨ ===== DEPLOYMENT COMPLETADO ====="
               echo "Estado: EXITOSO"
               echo "Servicios activos:"
-              docker compose -f docker-compose.prod.yml ps
+              docker compose -f docker/docker-compose.prod.yml ps
               echo ""
               echo "Logs disponibles en: $DEPLOY_LOG"
               
