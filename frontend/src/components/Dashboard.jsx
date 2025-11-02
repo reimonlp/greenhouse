@@ -23,7 +23,6 @@ import LogViewer from './LogViewer';
 import { useWebSocket, useSensorUpdates, useRelayUpdates, useStormEvent } from '../hooks/useWebSocket';
 
 function Dashboard() {
-  console.log('[DEBUG] Dashboard montado: esperando eventos WebSocket y datos de relés');
   // Conexión y datos por WebSocket hooks
   const stormData = useStormEvent();
   const sensorData = useSensorUpdates();
