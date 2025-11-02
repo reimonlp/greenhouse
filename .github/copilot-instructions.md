@@ -320,7 +320,60 @@ docker compose logs -f app | grep "sensor:new"
 - **Use TTL awareness**: Old sensor data auto-deletes; if querying old data, check timestamps
 - **Environment isolation**: `.env` for local dev (insecure token), `.env.production` for VPS (never commit)
 - **GitHub Secrets**: Always use for sensitive data (tokens, passwords, API keys)
-````
-- **Rate limiting affects tests**: If testing high-frequency events, adjust `RATE_LIMIT_MAX_EVENTS` in `rateLimiter.js`
-- **Use TTL awareness**: Old sensor data auto-deletes; if querying old data, check timestamps
-- **Environment isolation**: `.env` for local dev (insecure token), `.env.production` for VPS (never commit)
+
+## Docker & Deployment Quick Reference
+
+### Development Local
+```bash
+# Build y start
+docker compose build
+docker compose up -d
+
+# Verificar
+curl http://localhost:3000/health
+
+# Logs
+docker compose logs -f app
+
+# Clean
+docker compose down -v
+```
+
+### Producción VPS
+```bash
+# El deploy se ejecuta automáticamente via GitHub Actions al hacer push a main
+# Workflow: .github/workflows/deploy.yml
+
+# Manual monitoring:
+docker compose -f docker/docker-compose.prod.yml logs -f app
+docker compose -f docker/docker-compose.prod.yml ps
+```
+
+### Port Configuration
+
+| Entorno | Puerto | Servicio | Descripción |
+|---------|--------|----------|-------------|
+| **Desarrollo** | 3000 | Express | Frontend + API + WebSocket |
+| **Desarrollo** | 27017 | MongoDB | Solo debugging |
+| **Producción** | 3000 (localhost) | Express | Solo desde Nginx |
+| **Producción** | 80/443 | Nginx | Proxy reverso público |
+
+### URLs por Entorno
+
+**Desarrollo Local:**
+- Frontend: http://localhost:3000
+- Health: http://localhost:3000/health
+- WebSocket: http://localhost:3000/socket.io/
+
+**Producción:**
+- Frontend: https://reimon.dev/greenhouse/
+- Health: https://reimon.dev/greenhouse/health
+- WebSocket: https://reimon.dev/greenhouse/socket.io/
+
+### Files Reference
+- `docker/docker-compose.yml` - Desarrollo local
+- `docker/docker-compose.prod.yml` - Producción VPS
+- `docker/Dockerfile` - Build multi-stage (development)
+- `docker/Dockerfile.prod` - Build multi-stage (production)
+- `docker/generate_env.sh` - Script para generar .env.production
+- `.github/workflows/deploy.yml` - GitHub Actions automation
