@@ -163,7 +163,30 @@ export function useRules() {
     webSocketService.fetchRules();
   }, []);
 
+  // Esperar a conexión WebSocket antes de fetchear
   useEffect(() => {
+    const requestRules = () => {
+      setTimeout(() => {
+        fetchRules();
+      }, 100);
+    };
+
+    // Escuchar el evento de conexión
+    const unsubscribeConn = webSocketService.on('connection:status', ({ connected }) => {
+      if (connected) {
+        requestRules();
+      }
+    });
+
+    // Si ya está conectado, solicitar ahora
+    if (webSocketService.socket?.connected) {
+      requestRules();
+    }
+
+    return unsubscribeConn;
+  }, [fetchRules]);
+
+  useEffect(() {
     const unsubscribeList = webSocketService.on('rule:list', (response) => {
       if (response.success) {
         setRules(response.data);
@@ -192,16 +215,13 @@ export function useRules() {
       }
     });
 
-    // Initial fetch on mount
-    fetchRules();
-
     return () => {
       unsubscribeList();
       unsubscribeCreated();
       unsubscribeUpdated();
       unsubscribeDeleted();
     };
-  }, [fetchRules]);
+  }, []);
 
   return { rules, loading, error, fetchRules };
 }
@@ -216,6 +236,29 @@ export function useLogs(limit = 50, level = null, source = null) {
     webSocketService.fetchLogs(limit, level, source);
   }, [limit, level, source]);
 
+  // Esperar a conexión WebSocket antes de fetchear
+  useEffect(() => {
+    const requestLogs = () => {
+      setTimeout(() => {
+        fetchLogs();
+      }, 100);
+    };
+
+    // Escuchar el evento de conexión
+    const unsubscribeConn = webSocketService.on('connection:status', ({ connected }) => {
+      if (connected) {
+        requestLogs();
+      }
+    });
+
+    // Si ya está conectado, solicitar ahora
+    if (webSocketService.socket?.connected) {
+      requestLogs();
+    }
+
+    return unsubscribeConn;
+  }, [fetchLogs]);
+
   useEffect(() => {
     const unsubscribe = webSocketService.on('log:list', (response) => {
       if (response.success) {
@@ -227,11 +270,8 @@ export function useLogs(limit = 50, level = null, source = null) {
       setLoading(false);
     });
 
-    // Initial fetch on mount
-    fetchLogs();
-
     return unsubscribe;
-  }, [fetchLogs]);
+  }, []);
 
   return { logs, loading, error, fetchLogs };
 }
