@@ -103,8 +103,24 @@ Backend → Frontend (WEBSOCKET ONLY):
 **Backend Development** (`backend/`):
 - Start: `npm start` (reads `.env`, validates ESP32_AUTH_TOKEN)
 - Health check: `curl http://localhost:3000/health`
-- WebSocket handlers: `sockets/socketHandlers.js` (all event handlers)
-- Database: `config/database.js` (MongoDB connection and schemas)
+- Architecture: Modular structure with handlers/, middleware/, lib/, models/, config/, sockets/
+  - `app.js` (55 lines) - Entry point & orchestration only
+  - `handlers/` - HTTP endpoints (health.js, frontend.js)
+  - `middleware/` - Request processing (cors-security.js, rateLimiter.js)
+  - `lib/` - Utilities (server-setup.js, health-stats.js, **ruleEngine.js**)
+  - `sockets/socketHandlers.js` - All WebSocket event handlers
+  - `models/` - MongoDB schemas (SensorReading, RelayState, Rule, SystemLog)
+  - `config/database.js` - MongoDB connection
+- **Rule Engine** (`lib/ruleEngine.js`):
+  - `evaluateSensorRules(sensorReading)` - Triggered on new sensor data
+    - Evaluates all enabled sensor-based rules
+    - Conditions: temperature, humidity, soil_moisture with operators (>, <, >=, <=, ==)
+    - Actions: turn_on, turn_off via relay_id (0=Lights, 1=Fan, 2=Pump, 3=Heater)
+    - Saves RelayState to MongoDB with mode='rule'
+  - `evaluateTimeRules()` - Runs every 60 seconds
+    - Evaluates time-based rules at scheduled times
+    - Supports specific days of week (0=Sunday, 6=Saturday)
+    - Automatic relay control with full audit trail
 - Rate limiter: `middleware/rateLimiter.js` (120 events/min per socket)
 - Logs: `docker compose logs -f app` (when in containers)
 
@@ -328,6 +344,8 @@ const wsUrl = import.meta.env.DEV
 ## Useful References
 
 - **`esp32-firmware/include/config.h`**: Central firmware config (debug, timings, sensor sensitivity)
+- **`backend/app.js`**: Entry point & orchestration (55 lines)
+- **`backend/lib/ruleEngine.js`**: Sensor and time-based rule evaluation engine
 - **`backend/sockets/socketHandlers.js`**: All WebSocket event handlers
 - **`frontend/src/hooks/useWebSocket.js`**: Frontend real-time data subscriptions
 
