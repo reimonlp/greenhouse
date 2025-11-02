@@ -87,25 +87,29 @@ export function useRelayUpdates() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Solicitar estado inicial al montar
+  // Solicitar estado inicial al conectar
   useEffect(() => {
     const requestRelayStates = () => {
       setLoading(true);
       webSocketService.fetchRelayStates();
     };
 
+    // Escuchar el evento de conexión establecida
+    const unsubscribe = webSocketService.on('connection:status', ({ connected }) => {
+      if (connected) {
+        // Pequeño delay para asegurar que el socket está listo
+        setTimeout(() => {
+          requestRelayStates();
+        }, 100);
+      }
+    });
+
+    // Si ya está conectado, solicitar ahora
     if (webSocketService.socket?.connected) {
       requestRelayStates();
-    } else {
-      // Si no está conectado aún, esperar a que conecte
-      const onConnect = () => {
-        requestRelayStates();
-      };
-      webSocketService.socket?.on('connect', onConnect);
-      return () => {
-        webSocketService.socket?.off('connect', onConnect);
-      };
     }
+
+    return unsubscribe;
   }, []);
 
   // Listener para relay:states response
