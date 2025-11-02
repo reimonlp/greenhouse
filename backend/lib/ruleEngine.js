@@ -35,7 +35,11 @@ async function evaluateSensorRules(sensorReading, io) {
       rule_type: 'sensor'
     }).lean();
 
+    console.log(`🔍 [RULES] Checking ${sensorRules.length} sensor-based rules`);
+    console.log(`📊 [SENSOR] Temp: ${sensorReading.temperature}°C, Humidity: ${sensorReading.humidity}%, Soil: ${sensorReading.soil_moisture}%`);
+
     if (sensorRules.length === 0) {
+      console.log(`⚪ [RULES] No sensor-based rules found`);
       return;
     }
 
@@ -50,15 +54,17 @@ async function evaluateSensorRules(sensorReading, io) {
       // Get sensor value
       const sensorValue = sensorReading[condition.sensor];
       if (sensorValue === undefined) {
+        console.warn(`⚠️  [WARN] Sensor "${condition.sensor}" not found in reading`);
         continue;
       }
 
       // Evaluate condition
       const conditionMet = evaluateCondition(sensorValue, condition.operator, condition.threshold);
+      console.log(`  📋 Rule: ${rule.name || rule._id.toString().substring(0, 8)}... | Sensor: ${condition.sensor}=${sensorValue} ${condition.operator} ${condition.threshold} | Result: ${conditionMet}`);
       
       if (conditionMet) {
         const actionState = action === 'turn_on' || action === 'on';
-        console.log(`✅ [RULE] Sensor rule triggered: ${rule.name || `Rule ${rule._id}`}`);
+        console.log(`✅ [RULE] Sensor rule TRIGGERED: ${rule.name || `Rule ${rule._id}`}`);
         console.log(`   Sensor: ${condition.sensor}, Value: ${sensorValue}, Operator: ${condition.operator}, Threshold: ${condition.threshold}`);
         console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
 
@@ -86,7 +92,10 @@ async function evaluateTimeRules(io) {
       rule_type: 'time'
     }).lean();
 
+    console.log(`🔍 [RULES] Checking ${timeRules.length} time-based rules`);
+
     if (timeRules.length === 0) {
+      console.log(`⚪ [RULES] No time-based rules found`);
       return;
     }
 
@@ -173,6 +182,8 @@ async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'sy
       return null;
     }
 
+    console.log(`💾 [DB] Saving relay state: Relay ${relayId}, State: ${state}, Mode: ${mode}, Changed by: ${changedBy}`);
+
     // Save relay state to database
     const relayState = await RelayState.create({
       relay_id: relayId,
@@ -181,6 +192,8 @@ async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'sy
       changed_by: String(changedBy),
       timestamp: new Date()
     });
+
+    console.log(`✅ [DB] Relay state saved successfully: ${relayState._id}`);
 
     // Log the action
     await SystemLog.create({
@@ -197,6 +210,7 @@ async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'sy
 
     // Broadcast relay:command to ESP32 devices (same as dashboard command)
     if (io) {
+      console.log(`📡 [BROADCAST] Sending relay:command to ESP32 devices`);
       io.to('esp32_devices').emit('relay:command', {
         relay_id: relayId,
         state: state,
@@ -205,10 +219,13 @@ async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'sy
         timestamp: new Date()
       });
       console.log(`📡 [BROADCAST] relay:command sent to ESP32 devices`);
+    } else {
+      console.warn(`⚠️  [WARN] No io instance available, cannot broadcast relay:command`);
     }
 
     // Broadcast relay state change to all connected clients (dashboard)
     if (io) {
+      console.log(`📡 [BROADCAST] Sending relay:changed to all clients`);
       io.emit('relay:changed', {
         relay_id: relayId,
         state: state,
