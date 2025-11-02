@@ -7,7 +7,7 @@ const express = require('express');
 const path = require('path');
 
 function setupFrontendRoutes(app) {
-  const frontendPath = path.join(__dirname, '../frontend/dist');
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
 
   // Serve static assets from /greenhouse/assets (production via Nginx proxy)
   // AND from /assets (local dev without /greenhouse prefix)
