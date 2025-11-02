@@ -69,7 +69,7 @@ async function evaluateSensorRules(sensorReading, io) {
         console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
 
         // Execute the action
-        await executeRelayAction(relay_id, actionState, 'rule', rule._id, io);
+        await executeRelayAction(relay_id, actionState, 'auto', 'rule', io);
       }
     }
   } catch (error) {
@@ -131,7 +131,7 @@ async function evaluateTimeRules(io) {
       console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
 
       // Execute the action
-      await executeRelayAction(relay_id, actionState, 'rule', rule._id, io);
+      await executeRelayAction(relay_id, actionState, 'auto', 'rule', io);
     }
   } catch (error) {
     console.error('❌ [ERROR] Failed to evaluate time rules:', error.message);
@@ -174,7 +174,7 @@ function evaluateCondition(value, operator, threshold) {
  * @param {Object} io - Socket.IO instance for broadcasting relay:command
  * @returns {Promise<Object>} - Updated relay state
  */
-async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'system', io = null) {
+async function executeRelayAction(relayId, state, mode = 'auto', changedBy = 'system', io = null) {
   try {
     // Validate relay ID
     if (relayId < 0 || relayId > 3) {
