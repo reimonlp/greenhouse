@@ -24,7 +24,7 @@ const RELAY_NAMES = {
   0: { name: 'Luces', icon: <Lightbulb /> },
   1: { name: 'Ventilador', icon: <Air /> },
   2: { name: 'Bomba', icon: <Water /> },
-  3: { name: 'Calefactor', icon: <Whatshot /> }
+  3: { name: 'Lámpara Infrarroja', icon: <Whatshot /> }
 };
 
 function RelayControl({ relay, onToggle }) {

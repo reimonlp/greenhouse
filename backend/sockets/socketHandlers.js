@@ -47,7 +47,7 @@ function setupSocketHandlers(ioInstance, esp32Token, evaluateSensorRulesFn) {
           0: 'luces',
           1: 'ventilador',
           2: 'bomba',
-          3: 'calefactor'
+          3: 'lampara_infrarroja'
         };
         
         const statesWithNames = states.map(state => ({
@@ -110,7 +110,7 @@ function setupSocketHandlers(ioInstance, esp32Token, evaluateSensorRulesFn) {
           0: { name: 'Luces', default_state: false },
           1: { name: 'Ventilador', default_state: false },
           2: { name: 'Bomba', default_state: false },
-          3: { name: 'Calefactor', default_state: false }
+          3: { name: 'Lámpara Infrarroja', default_state: false }
         };
 
         for (const [relay_id, config] of Object.entries(RELAY_DEFAULTS)) {
