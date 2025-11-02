@@ -100,10 +100,13 @@ async function evaluateTimeRules(io) {
     }
 
     const now = new Date();
-    const currentHour = String(now.getHours()).padStart(2, '0');
-    const currentMinute = String(now.getMinutes()).padStart(2, '0');
+    
+    // Argentina timezone (ART, UTC-3)
+    const argentinaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+    const currentHour = String(argentinaTime.getHours()).padStart(2, '0');
+    const currentMinute = String(argentinaTime.getMinutes()).padStart(2, '0');
     const currentTime = `${currentHour}:${currentMinute}`;
-    const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const dayOfWeek = argentinaTime.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
 
     for (const rule of timeRules) {
       const { schedule, action, relay_id } = rule;
