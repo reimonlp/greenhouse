@@ -153,8 +153,6 @@ function Dashboard() {
           )}
         </Paper>
 
-// Eliminar fragmentos sueltos fuera del return principal
-
         {/* Rule Manager */}
         <RuleManager />
 
