@@ -95,22 +95,38 @@ jobs:
               # 4. Reemplazar proyecto actual
               echo "🔄 Paso 4: Activando nuevo código..."
               cd /home/rei
-              rm -rf "$PROJECT_DIR.old"
-              [ -d "$PROJECT_DIR" ] && mv "$PROJECT_DIR" "$PROJECT_DIR.old" || true
+              
+              # Limpiar directorio anterior si existe
+              if [ -d "$PROJECT_DIR.old" ]; then
+                sudo rm -rf "$PROJECT_DIR.old"
+              fi
+              
+              # Renombrar actual como .old (para rollback)
+              if [ -d "$PROJECT_DIR" ]; then
+                mv "$PROJECT_DIR" "$PROJECT_DIR.old"
+              fi
+              
+              # Activar nuevo código
               mv "$PROJECT_TMP" "$PROJECT_DIR"
               echo "✅ Código actualizado"
               echo ""
               
               # 5. Reiniciar backend
-              echo "🔄 Paso 5: Reiniciando backend..."
-              cd "$PROJECT_DIR"
+              echo "🔄 Paso 5: Construyendo e iniciando backend..."
+              
+              # Build Docker image
+              echo "   Building Docker image..."
+              docker compose -f docker/docker-compose.prod.yml build app 2>&1 | grep -E "^(Step|Successfully|ERROR)" || true
+              
+              # Start backend
               docker compose -f docker/docker-compose.prod.yml down app 2>/dev/null || true
               docker compose -f docker/docker-compose.prod.yml up -d app
-              echo "✅ Backend reiniciado"
+              echo "✅ Backend iniciado"
               echo ""
               
               # 6. Health checks (con reintentos)
               echo "🏥 Paso 6: Verificando salud de servicios..."
+              sleep 15  # Wait for backend to fully start
               MAX_RETRIES=5
               RETRY=0
               HEALTH_OK=false
@@ -136,13 +152,13 @@ jobs:
                 # Rollback: restaurar versión anterior
                 cd /home/rei
                 docker compose -f "$PROJECT_DIR/docker/docker-compose.prod.yml" down app 2>/dev/null || true
-                rm -rf "$PROJECT_DIR"
+                sudo rm -rf "$PROJECT_DIR"
                 [ -d "$PROJECT_DIR.old" ] && mv "$PROJECT_DIR.old" "$PROJECT_DIR"
                 cd "$PROJECT_DIR"
                 docker compose -f docker/docker-compose.prod.yml up -d app
                 
                 sleep 5
-                if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
+                if curl -sf https://reimon.dev/greenhouse/health > /dev/null 2>&1; then
                   echo "✅ Rollback completado - servicios restaurados"
                 else
                   echo "❌ CRÍTICO: Rollback falló - revisar manualmente"
@@ -153,7 +169,7 @@ jobs:
               
               # 7. Limpiar
               echo "🧹 Paso 7: Limpiando..."
-              rm -rf "$PROJECT_DIR.old"
+              sudo rm -rf "$PROJECT_DIR.old"
               echo "✅ Limpieza completada"
               echo ""
               
