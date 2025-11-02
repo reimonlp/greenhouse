@@ -40,7 +40,7 @@ Backend → Frontend (WEBSOCKET ONLY):
 - **ESP32_AUTH_TOKEN**: 32+ char Bearer token (must be identical in `secrets.h` and backend `.env`)
 - Generate: `openssl rand -hex 32`
 - **Never commit**: `.env`, `.env.production`, `secrets.h` (use `.example.h` templates)
-- Validation in `backend/server.js` (fatal error if missing or <32 chars)
+- Validation in `backend/app.js` (fatal error if missing or <32 chars)
 
 ### WebSocket Rate Limiting
 - **Limit**: 120 events/minute per socket (in `middleware/rateLimiter.js`)
@@ -103,27 +103,106 @@ Backend → Frontend (WEBSOCKET ONLY):
 **Backend Development** (`backend/`):
 - Start: `npm start` (reads `.env`, validates ESP32_AUTH_TOKEN)
 - Health check: `curl http://localhost:3000/health`
-- WebSocket handlers: `sockets/socketHandlers.js` (all 8+ event handlers)
-- API routes: `routes/api.js` (error handler only; all business logic in WebSocket)
-- Logs: `docker compose logs -f app` (for container env)
+- WebSocket handlers: `sockets/socketHandlers.js` (all event handlers)
+- Database: `config/database.js` (MongoDB connection and schemas)
+- Rate limiter: `middleware/rateLimiter.js` (120 events/min per socket)
+- Logs: `docker compose logs -f app` (when in containers)
 
 **Frontend Development** (`frontend/`):
-- Dev server: `npm run dev` (port 5173, connects to localhost:3000)
-- Build: `npm run build` → `dist/` (served by Nginx in production)
-- WebSocket service: `src/services/websocket.js` (connects to `https://reimon.dev` in prod)
-- Helper methods: `fetchRules()`, `sendRelayCommand()`, `fetchLogs()`, `fetchSensorHistory()`
-- Hooks: `src/hooks/useWebSocket.js` (useRelayUpdates, useSensorUpdates, useRules, useLogs, useSensorHistory)
-- All components use hooks for real-time updates (no direct HTTP calls)
+- Dev server: `npm run dev` (port 5173, auto-connects to localhost:3000)
+- Build: `npm run build` → `dist/` (static files served by Express)
+- WebSocket service: `src/services/websocket.js` (environment-aware URL detection)
+- Hooks: `src/hooks/useWebSocket.js` (8 custom React hooks)
+- Components use hooks exclusively (no HTTP calls)
 
 **Docker & Deployment**:
-- Local dev: `docker compose up -d` (MongoDB + backend + frontend hot-reload via volumes)
-- Production: `docker compose -f docker-compose.prod.yml up -d` (tagged images, no volumes)
-- Health checks in both compose files (30s interval, 3 retries)
-- MongoDB 4.4 for compatibility with older CPUs (no AVX)
+- Local dev: `docker compose up -d` (MongoDB + backend with hot-reload volumes)
+- MongoDB 4.4 for CPU compatibility (no AVX requirement)
+
+## Production Architecture: Deployment & Nginx Proxy
+
+### The Setup
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Internet (HTTPS: https://reimon.dev/greenhouse/*)           │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ External Nginx Server (Port 80/443)                         │
+│ ⚠️  NOT controlled by this project - managed externally      │
+│ Proxy rule: /greenhouse/* → http://127.0.0.1:3000/*        │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Docker Container: Express + Socket.IO (localhost:3000)      │
+│ - Serves frontend build artifacts                           │
+│ - Serves /socket.io/ WebSocket endpoint                     │
+│ - Health check endpoint                                     │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ MongoDB (Docker internal, port 27017, not exposed)          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### How the Nginx Proxy Works
+
+The Nginx server is **NOT** controlled by this project. An external team manages `/etc/nginx/` configuration.
+
+**Request flow:**
+```
+Browser:  https://reimon.dev/greenhouse/api/relay/states
+            ↓
+External Nginx (config not in repo):
+  location /greenhouse/ {
+      proxy_pass http://127.0.0.1:3000/;  # Strips /greenhouse/ prefix
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      # WebSocket Upgrade headers automatically handled
+  }
+            ↓
+Our Backend (Express at localhost:3000):
+  Receives: GET /api/relay/states
+  (without the /greenhouse/ prefix)
+```
+
+### Why This Works
+
+1. **Frontend built for `/greenhouse/` path**
+   - `vite.config.js` has `base: '/greenhouse/'`
+   - All assets: `/greenhouse/assets/...`
+   - React Router handles paths within `/greenhouse/`
+
+2. **Nginx strips the prefix**
+   - Request `/greenhouse/foo` → `/foo` (proxied to localhost:3000)
+
+3. **Express handles all requests**
+   - Static files at localhost:3000
+   - WebSocket at localhost:3000/socket.io/
+   - Health endpoint at localhost:3000/health
+
+4. **WebSocket through the proxy**
+   - Client: `https://reimon.dev/greenhouse/socket.io/`
+   - Nginx: `http://127.0.0.1:3000/socket.io/` (with Upgrade headers)
+   - Result: Real-time bidirectional communication
+
+### URL Configuration by Environment
+
+| Environment | URL | Path |
+|-------------|-----|------|
+| **Dev** | http://localhost:3000 | / (root) |
+| **Prod** | https://reimon.dev | /greenhouse/ |
+
+Frontend auto-detects via `import.meta.env.DEV`:
+```javascript
+// src/services/websocket.js
+const wsUrl = import.meta.env.DEV 
+  ? 'http://localhost:3000' 
+  : 'https://reimon.dev/greenhouse'
+```
 
 ## Automated Deployment (GitHub Actions)
-
-**Trigger**: Push to `main` branch automatically deploys to VPS
 
 **Setup** (One-time):
 1. Generate SSH key on VPS: `ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N ""`
@@ -236,9 +315,9 @@ Backend → Frontend (WEBSOCKET ONLY):
 - Data age queries use `timestamp`, but TTL uses `createdAt` (auto-managed by Mongoose)
 
 ### CORS & Proxy Behind Nginx
-- Frontend connects to proxy URL (e.g., `https://reimon.dev`), not direct backend
-- `ALLOWED_ORIGINS` in `.env` must include proxy domain for WebSocket CORS
-- Nginx proxies `/socket.io/` to backend port 8080 (see `nginx-prod.conf`)
+- Frontend connects to `https://reimon.dev` proxy URL, not direct backend
+- Nginx (external team manages) proxies `/greenhouse/*` → `localhost:3000/`
+- WebSocket Upgrade headers automatically handled by Nginx
 
 ### Climate Data in Sensor Handler
 - `sensor:data` WebSocket handler fetches climate from Open-Meteo API
@@ -248,132 +327,68 @@ Backend → Frontend (WEBSOCKET ONLY):
 
 ## Useful References
 
-- **`PROJECT_SUMMARY.md`**: Full architecture diagrams, data models
-- **`DEPLOYMENT_SUMMARY.md`**: Deployment phases, checklist, SSL/Nginx setup
-- **`docker/README.md`**: Quick start, troubleshooting, environment setup
 - **`esp32-firmware/include/config.h`**: Central firmware config (debug, timings, sensor sensitivity)
-- **`backend/sockets/socketHandlers.js`**: All WebSocket event handlers (8+)
+- **`backend/sockets/socketHandlers.js`**: All WebSocket event handlers
 - **`frontend/src/hooks/useWebSocket.js`**: Frontend real-time data subscriptions
 
-## Example: Test WebSocket Sensor Data Reception
+## Example: Test WebSocket Connection
 
 ```bash
 # Monitor backend for incoming sensor:data events
 docker compose logs -f app | grep "sensor:new"
 
-# Monitor frontend DevTools console for real-time updates
-# Open DevTools → Console
-# Should see: "[WS] Evento sensor:new recibido:"
+# Check health status
+curl http://localhost:3000/health
 
-# Trigger relay command via WebSocket (browser DevTools):
+# Trigger relay command via browser console
 # webSocketService.emitToServer('relay:command', {relay_id: 0, state: true, mode: 'manual'})
 ```
 
-## AI Agent Tips - Nov 2 2025 Session Update
+## Quick Commands Reference
 
-**Session accomplishments:**
-- ✅ Renamed `greenhouse-dashboard/` → `frontend/` (updated 13+ references)
-- ✅ Renamed `backend-websocket-update/` → `backend/` (updated 7+ references)
-- ✅ Implemented automated GitHub Actions deployment workflow
-- ✅ SSH-based git pull + auto-restart on push to main
-- ✅ Automatic rollback if health check fails
-- ✅ Environment variables from GitHub Secrets (secure)
-- ✅ `secrets.h` backup & restore on rollback
-- ✅ Token recovery via GitHub Secrets
-
-**Deploy Workflow Summary:**
-- ✅ Reads `.env.production` from `ENV_PRODUCTION` secret
-- ✅ Copies to all 3 locations automatically
-- ✅ Backup before deploy (excludes node_modules, dist, logs)
-- ✅ Health checks via `https://reimon.dev/health` (5 retries)
-- ✅ Rollback on failure (restore code + .env + secrets.h)
-- ✅ Total time: 2-5 minutes
-- ✅ Logs saved to `/home/rei/greenhouse/logs/deploy_TIMESTAMP.log`
-
-**Previous Session (Nov 1 2025):**
-- ✅ Fixed 7 backend bugs (missing imports, field name mismatches, duplicate calls, wrong paths)
-- ✅ Removed all REST API endpoints (9 endpoints deleted, 76% reduction in routes/api.js)
-- ✅ Removed HTTP client code from ESP32 firmware (82% reduction in vps_client.cpp)
-- ✅ Enhanced `sensor:data` handler with climate logic and storm detection
-- ✅ All frontend components already using WebSocket hooks
-
-**Current system state:**
-- **100% WebSocket**: No HTTP polling, no REST endpoints
-- **Latency**: 50-100ms (down from 200-500ms)
-- **Scalability**: Unlimited (single persistent connection per client)
-- **Compilation**: 0 errors
-- **Project structure**: Clean and standardized (backend/, frontend/, esp32-firmware/, docker/)
-
-**When adding features:**
-- Add WebSocket handler in `socketHandlers.js` (use rate limiter)
-- Add service helper in `websocket.js` if needed
-- Add hook in `useWebSocket.js` if component needs state management
-- Always broadcast changes to all connected clients via `io.emit()`
-- Test via browser DevTools Console for WebSocket events
-
-**Key reminders:**
-- **Always validate secrets** before firmware/backend builds (no default tokens in production)
-- **Check health first**: `/health` endpoint returns DB connection, version, uptime
-- **Logs are your friend**: `docker compose logs -f app` for backend, `pio device monitor` for ESP32
-- **WebSocket is the only transport**: No fallback to HTTP for dashboard or ESP32
-- **Rate limiting affects tests**: If testing high-frequency events, adjust `RATE_LIMIT_MAX_EVENTS` in `rateLimiter.js`
-- **Use TTL awareness**: Old sensor data auto-deletes; if querying old data, check timestamps
-- **Environment isolation**: `.env` for local dev (insecure token), `.env.production` for VPS (never commit)
-- **GitHub Secrets**: Always use for sensitive data (tokens, passwords, API keys)
-
-## Docker & Deployment Quick Reference
-
-### Development Local
 ```bash
-# Build y start
-docker compose build
-docker compose up -d
+# Firmware
+cd esp32-firmware
+pio run                                      # Build
+pio run --target upload                      # Upload
+pio device monitor --baud 115200             # Serial monitor
 
-# Verificar
-curl http://localhost:3000/health
+# Backend
+cd backend
+npm start                                    # Start server
+curl http://localhost:3000/health            # Health check
 
-# Logs
-docker compose logs -f app
+# Frontend
+cd frontend
+npm run dev                                  # Dev server (port 5173)
+npm run build                                # Production build
 
-# Clean
-docker compose down -v
+# Docker
+docker compose up -d                         # Start all services
+docker compose logs -f app                   # View backend logs
+docker compose down -v                       # Stop and remove volumes
+
+# Deployment
+# Push to main → GitHub Actions automatically deploys to VPS
+# Monitor: https://github.com/repo/actions (see workflow logs)
 ```
 
-### Producción VPS
-```bash
-# El deploy se ejecuta automáticamente via GitHub Actions al hacer push a main
-# Workflow: .github/workflows/deploy.yml
+## Current System State
 
-# Manual monitoring:
-docker compose -f docker/docker-compose.prod.yml logs -f app
-docker compose -f docker/docker-compose.prod.yml ps
-```
+- **100% WebSocket**: No HTTP polling or REST endpoints
+- **Latency**: 50-100ms real-time updates
+- **Scalability**: Single persistent connection per client
+- **Build**: 0 errors
+- **Project Structure**: Clean and organized
 
-### Port Configuration
+## Key Reminders
 
-| Entorno | Puerto | Servicio | Descripción |
-|---------|--------|----------|-------------|
-| **Desarrollo** | 3000 | Express | Frontend + API + WebSocket |
-| **Desarrollo** | 27017 | MongoDB | Solo debugging |
-| **Producción** | 3000 (localhost) | Express | Solo desde Nginx |
-| **Producción** | 80/443 | Nginx | Proxy reverso público |
-
-### URLs por Entorno
-
-**Desarrollo Local:**
-- Frontend: http://localhost:3000
-- Health: http://localhost:3000/health
-- WebSocket: http://localhost:3000/socket.io/
-
-**Producción:**
-- Frontend: https://reimon.dev/greenhouse/
-- Health: https://reimon.dev/greenhouse/health
-- WebSocket: https://reimon.dev/greenhouse/socket.io/
-
-### Files Reference
-- `docker/docker-compose.yml` - Desarrollo local
-- `docker/docker-compose.prod.yml` - Producción VPS
-- `docker/Dockerfile` - Build multi-stage (development)
-- `docker/Dockerfile.prod` - Build multi-stage (production)
-- `docker/generate_env.sh` - Script para generar .env.production
-- `.github/workflows/deploy.yml` - GitHub Actions automation
+- **Secrets**: Never commit `.env`, `.env.production`, or `secrets.h`
+- **Auth Token**: Must be 32+ chars, identical in firmware and backend
+- **WebSocket Only**: No HTTP fallback or REST endpoints
+- **Rate Limiting**: 120 events/minute per socket
+- **GitHub Secrets**: Use for sensitive data in CI/CD (VPS_HOST, VPS_SSH_KEY, ENV_PRODUCTION)
+- **Health Endpoint**: Always check after deployment (`curl https://reimon.dev/greenhouse/health`)
+- **TTL Data**: Sensor data auto-deletes after 30 days; check timestamps when querying old data
+- **Environment**: Dev uses localhost:3000, production uses https://reimon.dev/greenhouse/
+- **Nginx**: External team manages it; we proxy through /greenhouse/ path (NOT controlled by this project)
