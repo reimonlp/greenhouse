@@ -61,7 +61,10 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  path: '/socket.io/'
+  path: '/socket.io/',
+  // In production behind Nginx proxy at /greenhouse/socket.io/
+  // The browser sees /greenhouse/socket.io/ but needs to work both locally and on VPS
+  transports: ['websocket', 'polling']
 });
 
 // Custom morgan format to log real IP addresses
@@ -88,13 +91,18 @@ const path = require('path');
 const frontendPath = path.join(__dirname, '../frontend/dist');
 
 // Serve static files (CSS, JS, images, etc.)
+// The frontend is built with base: '/greenhouse/', so we need to serve it correctly
+app.use('/greenhouse/assets', express.static(path.join(frontendPath, 'assets')));
+app.use('/greenhouse/favicon.svg', express.static(path.join(frontendPath, 'favicon.svg')));
+
+// Also serve without /greenhouse prefix for direct backend access (local dev)
 app.use('/assets', express.static(path.join(frontendPath, 'assets')));
 app.use('/favicon.svg', express.static(path.join(frontendPath, 'favicon.svg')));
 
 // Serve the main React app for all non-API routes
 app.get('*', (req, res, next) => {
-  // Skip health check
-  if (req.path.startsWith('/socket.io/') || req.path === '/health') {
+  // Skip health check and API routes
+  if (req.path.startsWith('/socket.io/') || req.path === '/health' || req.path.startsWith('/api/')) {
     return next();
   }
   
