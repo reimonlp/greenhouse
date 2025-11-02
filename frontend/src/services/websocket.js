@@ -14,13 +14,32 @@ class WebSocketService {
       return;
     }
 
-  // Configura la URL del servidor WebSocket aquí:
-  const serverUrl = import.meta.env.VITE_WS_URL || 'https://reimon.dev';
+    // Determine server URL based on environment
+    let serverUrl;
+    let path;
     
-    // Silent connection - no log noise
+    if (import.meta.env.DEV) {
+      // Development: connect to local backend
+      serverUrl = 'http://localhost:3000';
+      path = '/socket.io/';
+    } else {
+      // Production: connect to domain root (Nginx proxies to backend)
+      serverUrl = 'https://reimon.dev';
+      path = '/greenhouse/socket.io/';
+    }
+    
+    // Allow override via environment variable
+    if (import.meta.env.VITE_WS_URL) {
+      serverUrl = import.meta.env.VITE_WS_URL;
+    }
+    
+    // Log the connection URL in development
+    if (import.meta.env.DEV) {
+      console.log('[WS] Connecting to:', serverUrl, 'with path:', path);
+    }
     
     this.socket = io(serverUrl, {
-  path: '/greenhouse/socket.io/',
+      path: path,
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
