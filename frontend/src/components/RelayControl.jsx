@@ -81,15 +81,17 @@ function RelayControl({ relay, onToggle }) {
             </Typography>
           </Box>
           
-          {loading ? (
-            <CircularProgress size={24} />
-          ) : (
-            <Switch
-              checked={relay.state}
-              onChange={handleToggle}
-              color="success"
-              disabled={loading}
-            />
+          {relay.mode === 'manual' && (
+            loading ? (
+              <CircularProgress size={24} />
+            ) : (
+              <Switch
+                checked={relay.state}
+                onChange={handleToggle}
+                color="success"
+                disabled={loading}
+              />
+            )
           )}
         </Box>
 
