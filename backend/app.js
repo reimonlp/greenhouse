@@ -7,7 +7,7 @@ const { setupFrontendRoutes } = require('./middleware/frontend-routes');
 const { createServer, setupSocketIO, startServer, setupGracefulShutdown } = require('./lib/server-setup');
 const { checkSocketRateLimit, socketRateLimits } = require('./middleware/rateLimiter');
 const { setupSocketHandlers } = require('./sockets/socketHandlers');
-const { setupHealthCheck } = require('./routes/health');
+const { setupHealthCheck } = require('./handlers/health');
 const { connectDatabase } = require('./config/database');
 
 // ESP32 authentication token - MUST be set in environment variables
