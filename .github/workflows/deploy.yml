@@ -126,7 +126,7 @@ jobs:
               
               # 6. Health checks (con reintentos)
               echo "🏥 Paso 6: Verificando salud de servicios..."
-              sleep 15  # Wait for backend to fully start
+              sleep 20  # Wait longer for backend to fully start and MongoDB to be ready
               MAX_RETRIES=5
               RETRY=0
               HEALTH_OK=false
@@ -140,7 +140,11 @@ jobs:
                   RETRY=$((RETRY + 1))
                   if [ $RETRY -lt $MAX_RETRIES ]; then
                     echo "⏳ Reintento $RETRY/$MAX_RETRIES en 3s..."
+                    echo "   (checking: https://reimon.dev/greenhouse/health)"
                     sleep 3
+                  else
+                    echo "   Docker logs para debugging:"
+                    docker compose -f docker/docker-compose.prod.yml logs app | tail -30
                   fi
                 fi
               done

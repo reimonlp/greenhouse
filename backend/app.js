@@ -9,7 +9,6 @@ const morgan = require('morgan');
 // Import modules
 const { checkSocketRateLimit, socketRateLimits } = require('./middleware/rateLimiter');
 const { setupSocketHandlers } = require('./sockets/socketHandlers');
-const { setupApiRoutes } = require('./routes/api');
 const { setupHealthCheck } = require('./routes/health');
 const { connectDatabase } = require('./config/database');
 
@@ -78,9 +77,6 @@ app.set('trust proxy', true);
 
 // ====== Setup Socket Handlers ======
 setupSocketHandlers(io, ESP32_AUTH_TOKEN, evaluateSensorRules);
-
-// ====== Setup API Routes ======
-setupApiRoutes(app, io, ESP32_AUTH_TOKEN, evaluateSensorRules);
 
 // ====== Setup Health Check ======
 setupHealthCheck(app, io, socketRateLimits);
