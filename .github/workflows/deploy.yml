@@ -143,22 +143,27 @@ jobs:
                 
                 # Rollback: restaurar desde backup
                 cd /home/rei
-                # Solo borrar el directorio del proyecto, no subdirectorios del sistema
-                rm -rf "$PROJECT_DIR/backend" "$PROJECT_DIR/frontend" "$PROJECT_DIR/esp32-firmware" "$PROJECT_DIR/docker/docker-compose*.yml" "$PROJECT_DIR/.github" "$PROJECT_DIR/platformio.ini" 2>/dev/null || true
-                # Restaurar backup completo
-                cp -r "$BACKUP_DIR" "$PROJECT_DIR"
+                echo "   Limpiando directorio actual..."
+                # Borrar solo archivos de código, no directorios del sistema
+                find "$PROJECT_DIR" -maxdepth 1 -type f -delete 2>/dev/null || true
+                find "$PROJECT_DIR" -maxdepth 1 -type d ! -name '.' ! -name '..' ! -name 'logs' ! -name 'backups' -exec rm -rf {} + 2>/dev/null || true
+                
+                # Restaurar desde backup
+                echo "   Restaurando código desde backup..."
+                rsync -av --delete "$BACKUP_DIR/" "$PROJECT_DIR/" 2>/dev/null || cp -r "$BACKUP_DIR"/* "$PROJECT_DIR/" 2>/dev/null || true
+                
                 cd "$PROJECT_DIR"
                 
                 # Restaurar archivos .env preservados
                 echo "   Restaurando configuración..."
-                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/" || true
-                [ -f "$ENV_BACKUP_DIR/.env" ] && cp "$ENV_BACKUP_DIR/.env" "$PROJECT_DIR/backend/" || true
-                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/docker/" || true
-                [ -f "$ENV_BACKUP_DIR/secrets.h" ] && cp "$ENV_BACKUP_DIR/secrets.h" "$PROJECT_DIR/esp32-firmware/include/" || true
+                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/.env.production" || true
+                [ -f "$ENV_BACKUP_DIR/.env" ] && cp "$ENV_BACKUP_DIR/.env" "$PROJECT_DIR/backend/.env" || true
+                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/docker/.env.production" || true
+                [ -f "$ENV_BACKUP_DIR/secrets.h" ] && mkdir -p "$PROJECT_DIR/esp32-firmware/include" && cp "$ENV_BACKUP_DIR/secrets.h" "$PROJECT_DIR/esp32-firmware/include/" || true
                 
                 # Reiniciar con versión anterior
-                docker compose -f docker/docker-compose.prod.yml down app
-                docker compose -f docker/docker-compose.prod.yml up -d app
+                echo "   Reiniciando servicios..."
+                docker compose -f docker/docker-compose.prod.yml restart app 2>/dev/null || docker compose -f docker/docker-compose.prod.yml up -d app
                 
                 sleep 5
                 if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
