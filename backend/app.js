@@ -36,7 +36,9 @@ const server = createServer(app);
 const io = setupSocketIO(server);
 
 // ====== Setup Routes & Handlers ======
-setupSocketHandlers(io, ESP32_AUTH_TOKEN, evaluateSensorRules);
+// Create wrapper for evaluateSensorRules that includes io
+const evaluateSensorRulesWithIO = (sensorReading) => evaluateSensorRules(sensorReading, io);
+setupSocketHandlers(io, ESP32_AUTH_TOKEN, evaluateSensorRulesWithIO);
 setupHealthCheck(app, io, socketRateLimits);
 setupFrontendRoutes(app);
 
@@ -45,7 +47,7 @@ connectDatabase();
 
 // ====== Time-based Rules Scheduler ======
 setInterval(async () => {
-  await evaluateTimeRules();
+  await evaluateTimeRules(io);
 }, 60000); // Every minute
 
 // ====== Start Server ======

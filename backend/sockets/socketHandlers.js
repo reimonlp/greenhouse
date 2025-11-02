@@ -229,7 +229,7 @@ function setupSocketHandlers(ioInstance, esp32Token, evaluateSensorRulesFn) {
         io.emit('sensor:new', sensorReading);
 
         // Evaluate sensor-based rules (will log if thresholds exceeded)
-        await evaluateSensorRules(sensorReading);
+        await evaluateSensorRules(sensorReading, io);
       } catch (error) {
         console.error('❌ [ERROR] Failed to save sensor data:', error.message);
       }

@@ -24,9 +24,10 @@ const RELAY_NAMES = {
  * Called when new sensor data arrives from ESP32
  * 
  * @param {Object} sensorReading - Latest sensor data {temperature, humidity, soil_moisture}
+ * @param {Object} io - Socket.IO instance for broadcasting relay:command
  * @returns {Promise<void>}
  */
-async function evaluateSensorRules(sensorReading) {
+async function evaluateSensorRules(sensorReading, io) {
   try {
     // Find all enabled sensor-based rules
     const sensorRules = await Rule.find({
@@ -62,7 +63,7 @@ async function evaluateSensorRules(sensorReading) {
         console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
 
         // Execute the action
-        await executeRelayAction(relay_id, actionState, 'rule', rule._id);
+        await executeRelayAction(relay_id, actionState, 'rule', rule._id, io);
       }
     }
   } catch (error) {
@@ -74,9 +75,10 @@ async function evaluateSensorRules(sensorReading) {
  * Evaluate time-based rules
  * Called every minute to check if scheduled rules should trigger
  * 
+ * @param {Object} io - Socket.IO instance for broadcasting relay:command
  * @returns {Promise<void>}
  */
-async function evaluateTimeRules() {
+async function evaluateTimeRules(io) {
   try {
     // Find all enabled time-based rules
     const timeRules = await Rule.find({
@@ -120,7 +122,7 @@ async function evaluateTimeRules() {
       console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
 
       // Execute the action
-      await executeRelayAction(relay_id, actionState, 'rule', rule._id);
+      await executeRelayAction(relay_id, actionState, 'rule', rule._id, io);
     }
   } catch (error) {
     console.error('❌ [ERROR] Failed to evaluate time rules:', error.message);
@@ -154,16 +156,16 @@ function evaluateCondition(value, operator, threshold) {
 
 /**
  * Helper: Execute relay action (turn on/off)
- * This saves the state to the database and logs the action
- * The WebSocket broadcast happens in socketHandlers
+ * This saves the state to the database, logs the action, and broadcasts to ESP32
  * 
  * @param {number} relayId - 0=Lights, 1=Fan, 2=Pump, 3=Heater
  * @param {boolean} state - true=on, false=off
  * @param {string} mode - 'manual' | 'auto' | 'rule' | 'system'
  * @param {string} changedBy - Rule ID or user identifier
+ * @param {Object} io - Socket.IO instance for broadcasting relay:command
  * @returns {Promise<Object>} - Updated relay state
  */
-async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'system') {
+async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'system', io = null) {
   try {
     // Validate relay ID
     if (relayId < 0 || relayId > 3) {
@@ -192,6 +194,29 @@ async function executeRelayAction(relayId, state, mode = 'rule', changedBy = 'sy
         changed_by: changedBy
       }
     });
+
+    // Broadcast relay:command to ESP32 devices (same as dashboard command)
+    if (io) {
+      io.to('esp32_devices').emit('relay:command', {
+        relay_id: relayId,
+        state: state,
+        mode: mode,
+        changed_by: changedBy,
+        timestamp: new Date()
+      });
+      console.log(`📡 [BROADCAST] relay:command sent to ESP32 devices`);
+    }
+
+    // Broadcast relay state change to all connected clients (dashboard)
+    if (io) {
+      io.emit('relay:changed', {
+        relay_id: relayId,
+        state: state,
+        mode: mode,
+        changed_by: changedBy,
+        timestamp: new Date()
+      });
+    }
 
     return relayState;
   } catch (error) {
