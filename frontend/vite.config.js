@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/greenhouse/', // Base path para el dominio reimon.dev/greenhouse
+  base: process.env.NODE_ENV === 'production' ? '/greenhouse/' : '/', // Production uses /greenhouse/, dev uses /
   server: {
     port: 5173,
     host: true
