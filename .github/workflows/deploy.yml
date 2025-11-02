@@ -99,10 +99,9 @@ jobs:
               echo "✅ Backend reiniciado"
               echo ""
               
-              # 5. Reiniciar frontend (Nginx)
-              echo "🔄 Paso 5: Reiniciando frontend (Nginx)..."
-              docker compose -f docker/docker-compose.prod.yml up -d web 2>&1 | tee -a "$DEPLOY_LOG"
-              echo "✅ Frontend reiniciado"
+              # 5. Si Nginx está en Docker, reiniciarlo (opcional)
+              # docker compose -f docker/docker-compose.prod.yml up -d web 2>&1 | tee -a "$DEPLOY_LOG"
+              echo "✅ Frontend (Nginx del sistema) está listo"
               echo ""
               
               # 6. Health checks (con reintentos)
@@ -132,7 +131,9 @@ jobs:
                 
                 # Rollback: restaurar desde backup
                 cd /home/rei
-                rm -rf "$PROJECT_DIR"
+                # Solo borrar el directorio del proyecto, no subdirectorios del sistema
+                rm -rf "$PROJECT_DIR/backend" "$PROJECT_DIR/frontend" "$PROJECT_DIR/esp32-firmware" "$PROJECT_DIR/docker/docker-compose*.yml" "$PROJECT_DIR/.github" "$PROJECT_DIR/platformio.ini" 2>/dev/null || true
+                # Restaurar backup completo
                 cp -r "$BACKUP_DIR" "$PROJECT_DIR"
                 cd "$PROJECT_DIR"
                 
@@ -144,8 +145,8 @@ jobs:
                 [ -f "$ENV_BACKUP_DIR/secrets.h" ] && cp "$ENV_BACKUP_DIR/secrets.h" "$PROJECT_DIR/esp32-firmware/include/" || true
                 
                 # Reiniciar con versión anterior
-                docker compose -f docker/docker-compose.prod.yml down app web
-                docker compose -f docker/docker-compose.prod.yml up -d app web
+                docker compose -f docker/docker-compose.prod.yml down app
+                docker compose -f docker/docker-compose.prod.yml up -d app
                 
                 sleep 5
                 if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
