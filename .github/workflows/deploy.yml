@@ -20,64 +20,51 @@ jobs:
             set -e
             
             PROJECT_DIR="/home/rei/greenhouse"
-            BACKUP_DIR="/home/rei/greenhouse-backup"
+            PROJECT_TMP="/home/rei/greenhouse-tmp"
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-            DEPLOY_LOG="/tmp/deploy_${TIMESTAMP}.log"
+            DEPLOY_LOG="/home/rei/greenhouse/logs/deploy_${TIMESTAMP}.log"
             
-            # Preservar archivos sensibles
-            ENV_BACKUP_DIR="/tmp/env_backup_${TIMESTAMP}"
-            mkdir -p "$ENV_BACKUP_DIR"
+            # Crear directorio de logs si no existe
+            mkdir -p "$(dirname "$DEPLOY_LOG")"
             
             {
               echo "🚀 ===== DEPLOYMENT INICIADO ====="
               echo "Timestamp: $TIMESTAMP"
-              echo "Proyecto: $PROJECT_DIR"
+              echo "Repositorio: https://github.com/reimonlp/greenhouse"
               echo ""
               
-              # Asegurar permisos correctos en el directorio del proyecto
-              chmod -R u+w "$PROJECT_DIR" 2>/dev/null || true
+              # 1. Clonar repositorio fresco
+              echo "📥 Paso 1: Clonando repositorio..."
+              if [ -d "$PROJECT_TMP" ]; then
+                rm -rf "$PROJECT_TMP"
+              fi
+              git clone https://github.com/reimonlp/greenhouse.git "$PROJECT_TMP" --quiet
+              cd "$PROJECT_TMP"
+              CURRENT_COMMIT=$(git rev-parse HEAD)
+              echo "✅ Clone completado: ${CURRENT_COMMIT:0:7}"
+              echo ""
               
-              # 0. Crear archivos .env desde GitHub Secrets
-              echo "🔐 Paso 0: Configurando variables de entorno..."
-              
-              # Crear .env.production en raíz
-              echo '${{ secrets.ENV_PRODUCTION }}' > "$PROJECT_DIR/.env.production"
-              chmod 644 "$PROJECT_DIR/.env.production"
-              
-              # Copiar a backend y docker (usando tee para evitar problemas de permisos)
-              cat "$PROJECT_DIR/.env.production" | tee "$PROJECT_DIR/backend/.env" > /dev/null
-              cat "$PROJECT_DIR/.env.production" | tee "$PROJECT_DIR/docker/.env.production" > /dev/null
-              chmod 644 "$PROJECT_DIR/backend/.env" "$PROJECT_DIR/docker/.env.production" 2>/dev/null || true
-              
-              # Preservar token ESP32 en secrets.h si existe
-              if grep -q "ESP32_AUTH_TOKEN" "$PROJECT_DIR/esp32-firmware/include/secrets.h" 2>/dev/null; then
-                echo "   ℹ️  ESP32 secrets.h preservado"
+              # 2. Restaurar archivos de configuración desde proyecto anterior
+              echo "🔐 Paso 2: Restaurando archivos de configuración..."
+              if [ -f "$PROJECT_DIR/.env.production" ]; then
+                cp "$PROJECT_DIR/.env.production" "$PROJECT_TMP/.env.production"
+                cp "$PROJECT_DIR/.env.production" "$PROJECT_TMP/backend/.env"
+                cp "$PROJECT_DIR/.env.production" "$PROJECT_TMP/docker/.env.production"
+                echo "   ✅ .env restaurados"
+              else
+                echo "   Creando .env desde GitHub Secrets..."
+                echo '${{ secrets.ENV_PRODUCTION }}' > "$PROJECT_TMP/.env.production"
+                cp "$PROJECT_TMP/.env.production" "$PROJECT_TMP/backend/.env"
+                cp "$PROJECT_TMP/.env.production" "$PROJECT_TMP/docker/.env.production"
               fi
               
-              echo "✅ Variables de entorno configuradas"
-              echo ""
-              
-              # 1. Crear backup del estado actual (excluyendo node_modules, dist, logs)
-              echo "📦 Paso 1: Creando backup..."
-              
-              # Preservar archivos .env y secrets
-              echo "   Preservando archivos de configuración..."
-              [ -f "$PROJECT_DIR/.env.production" ] && cp "$PROJECT_DIR/.env.production" "$ENV_BACKUP_DIR/"
-              [ -f "$PROJECT_DIR/backend/.env" ] && cp "$PROJECT_DIR/backend/.env" "$ENV_BACKUP_DIR/"
-              [ -f "$PROJECT_DIR/docker/.env.production" ] && cp "$PROJECT_DIR/docker/.env.production" "$ENV_BACKUP_DIR/"
-              [ -f "$PROJECT_DIR/esp32-firmware/include/secrets.h" ] && cp "$PROJECT_DIR/esp32-firmware/include/secrets.h" "$ENV_BACKUP_DIR/"
-              
-              if [ -d "$BACKUP_DIR" ]; then
-                rm -rf "$BACKUP_DIR"
+              # Restaurar secrets.h del ESP32
+              if [ -f "$PROJECT_DIR/esp32-firmware/include/secrets.h" ]; then
+                cp "$PROJECT_DIR/esp32-firmware/include/secrets.h" "$PROJECT_TMP/esp32-firmware/include/secrets.h"
+                echo "   ✅ ESP32 secrets.h restaurado"
               fi
-              rsync -av --exclude='node_modules' --exclude='dist' --exclude='logs' --exclude='.git' "$PROJECT_DIR/" "$BACKUP_DIR/"
-              echo "✅ Backup completado: $BACKUP_DIR"
+              
               echo ""
-              
-              # 2. Git pull
-              echo "📥 Paso 2: Actualizando repositorio..."
-              cd "$PROJECT_DIR"
-              
               # Verificar que es un repositorio git válido
               if [ ! -d ".git" ]; then
                 echo "⚠️  Directorio .git no encontrado, reinitializando repositorio..."
@@ -105,15 +92,21 @@ jobs:
               echo "✅ Configuración validada"
               echo ""
               
-              # 4. Reiniciar backend (sin MongoDB)
-              echo "🔄 Paso 4: Reiniciando backend..."
-              docker compose -f docker/docker-compose.prod.yml up -d app 2>&1 | tee -a "$DEPLOY_LOG"
-              echo "✅ Backend reiniciado"
+              # 4. Reemplazar proyecto actual
+              echo "🔄 Paso 4: Activando nuevo código..."
+              cd /home/rei
+              rm -rf "$PROJECT_DIR.old"
+              [ -d "$PROJECT_DIR" ] && mv "$PROJECT_DIR" "$PROJECT_DIR.old" || true
+              mv "$PROJECT_TMP" "$PROJECT_DIR"
+              echo "✅ Código actualizado"
               echo ""
               
-              # 5. Si Nginx está en Docker, reiniciarlo (opcional)
-              # docker compose -f docker/docker-compose.prod.yml up -d web 2>&1 | tee -a "$DEPLOY_LOG"
-              echo "✅ Frontend (Nginx del sistema) está listo"
+              # 5. Reiniciar backend
+              echo "🔄 Paso 5: Reiniciando backend..."
+              cd "$PROJECT_DIR"
+              docker compose -f docker/docker-compose.prod.yml down app 2>/dev/null || true
+              docker compose -f docker/docker-compose.prod.yml up -d app
+              echo "✅ Backend reiniciado"
               echo ""
               
               # 6. Health checks (con reintentos)
@@ -123,9 +116,8 @@ jobs:
               HEALTH_OK=false
               
               while [ $RETRY -lt $MAX_RETRIES ]; do
-                # Health check a través de Nginx en el host
                 if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
-                  echo "✅ Backend health check PASSED (vía Nginx)"
+                  echo "✅ Backend health check PASSED"
                   HEALTH_OK=true
                   break
                 else
@@ -138,32 +130,16 @@ jobs:
               done
               
               if [ "$HEALTH_OK" = false ]; then
-                echo "❌ Backend health check FALLÓ después de $MAX_RETRIES intentos"
+                echo "❌ Backend health check FALLÓ"
                 echo "🔙 Iniciando rollback..."
                 
-                # Rollback: restaurar desde backup
+                # Rollback: restaurar versión anterior
                 cd /home/rei
-                echo "   Limpiando directorio actual..."
-                # Borrar solo archivos de código, no directorios del sistema
-                find "$PROJECT_DIR" -maxdepth 1 -type f -delete 2>/dev/null || true
-                find "$PROJECT_DIR" -maxdepth 1 -type d ! -name '.' ! -name '..' ! -name 'logs' ! -name 'backups' -exec rm -rf {} + 2>/dev/null || true
-                
-                # Restaurar desde backup
-                echo "   Restaurando código desde backup..."
-                rsync -av --delete "$BACKUP_DIR/" "$PROJECT_DIR/" 2>/dev/null || cp -r "$BACKUP_DIR"/* "$PROJECT_DIR/" 2>/dev/null || true
-                
+                docker compose -f "$PROJECT_DIR/docker/docker-compose.prod.yml" down app 2>/dev/null || true
+                rm -rf "$PROJECT_DIR"
+                [ -d "$PROJECT_DIR.old" ] && mv "$PROJECT_DIR.old" "$PROJECT_DIR"
                 cd "$PROJECT_DIR"
-                
-                # Restaurar archivos .env preservados
-                echo "   Restaurando configuración..."
-                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/.env.production" || true
-                [ -f "$ENV_BACKUP_DIR/.env" ] && cp "$ENV_BACKUP_DIR/.env" "$PROJECT_DIR/backend/.env" || true
-                [ -f "$ENV_BACKUP_DIR/.env.production" ] && cp "$ENV_BACKUP_DIR/.env.production" "$PROJECT_DIR/docker/.env.production" || true
-                [ -f "$ENV_BACKUP_DIR/secrets.h" ] && mkdir -p "$PROJECT_DIR/esp32-firmware/include" && cp "$ENV_BACKUP_DIR/secrets.h" "$PROJECT_DIR/esp32-firmware/include/" || true
-                
-                # Reiniciar con versión anterior
-                echo "   Reiniciando servicios..."
-                docker compose -f docker/docker-compose.prod.yml restart app 2>/dev/null || docker compose -f docker/docker-compose.prod.yml up -d app
+                docker compose -f docker/docker-compose.prod.yml up -d app
                 
                 sleep 5
                 if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
@@ -175,11 +151,10 @@ jobs:
               fi
               echo ""
               
-              # 7. Limpiar backup si todo OK
+              # 7. Limpiar
               echo "🧹 Paso 7: Limpiando..."
-              rm -rf "$BACKUP_DIR"
-              rm -rf "$ENV_BACKUP_DIR"
-              echo "✅ Backup temporal eliminado"
+              rm -rf "$PROJECT_DIR.old"
+              echo "✅ Limpieza completada"
               echo ""
               
               # 8. Resumen final
@@ -188,7 +163,7 @@ jobs:
               echo "Servicios activos:"
               docker compose -f docker/docker-compose.prod.yml ps
               echo ""
-              echo "Logs disponibles en: $DEPLOY_LOG"
+              echo "Logs guardados en: $DEPLOY_LOG"
               
             } 2>&1 | tee "$DEPLOY_LOG"
             
