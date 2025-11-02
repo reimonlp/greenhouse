@@ -163,18 +163,20 @@ export function useRules() {
     webSocketService.fetchRules();
   }, []);
 
-  // Esperar a conexión WebSocket antes de fetchear
+  // Solicitar reglas al conectar
   useEffect(() => {
     const requestRules = () => {
-      setTimeout(() => {
-        fetchRules();
-      }, 100);
+      setLoading(true);
+      webSocketService.fetchRules();
     };
 
-    // Escuchar el evento de conexión
-    const unsubscribeConn = webSocketService.on('connection:status', ({ connected }) => {
+    // Escuchar el evento de conexión establecida
+    const unsubscribe = webSocketService.on('connection:status', ({ connected }) => {
       if (connected) {
-        requestRules();
+        // Pequeño delay para asegurar que el socket está listo
+        setTimeout(() => {
+          requestRules();
+        }, 100);
       }
     });
 
@@ -183,10 +185,11 @@ export function useRules() {
       requestRules();
     }
 
-    return unsubscribeConn;
-  }, [fetchRules]);
+    return unsubscribe;
+  }, []);
 
-  useEffect(() {
+  // Listener para rule:list response
+  useEffect(() => {
     const unsubscribeList = webSocketService.on('rule:list', (response) => {
       if (response.success) {
         setRules(response.data);
@@ -197,30 +200,40 @@ export function useRules() {
       setLoading(false);
     });
 
+    return unsubscribeList;
+  }, []);
+
+  // Listener para rule:created
+  useEffect(() => {
     const unsubscribeCreated = webSocketService.on('rule:created', (response) => {
       if (response.success) {
         setRules(prev => [...prev, response.data]);
       }
     });
 
+    return unsubscribeCreated;
+  }, []);
+
+  // Listener para rule:updated
+  useEffect(() => {
     const unsubscribeUpdated = webSocketService.on('rule:updated', (response) => {
       if (response.success) {
         setRules(prev => prev.map(r => r._id === response.data._id ? response.data : r));
       }
     });
 
+    return unsubscribeUpdated;
+  }, []);
+
+  // Listener para rule:deleted
+  useEffect(() => {
     const unsubscribeDeleted = webSocketService.on('rule:deleted', (response) => {
       if (response.success) {
         setRules(prev => prev.filter(r => r._id !== response.data.id));
       }
     });
 
-    return () => {
-      unsubscribeList();
-      unsubscribeCreated();
-      unsubscribeUpdated();
-      unsubscribeDeleted();
-    };
+    return unsubscribeDeleted;
   }, []);
 
   return { rules, loading, error, fetchRules };
@@ -236,18 +249,20 @@ export function useLogs(limit = 50, level = null, source = null) {
     webSocketService.fetchLogs(limit, level, source);
   }, [limit, level, source]);
 
-  // Esperar a conexión WebSocket antes de fetchear
+  // Solicitar logs al conectar
   useEffect(() => {
     const requestLogs = () => {
-      setTimeout(() => {
-        fetchLogs();
-      }, 100);
+      setLoading(true);
+      webSocketService.fetchLogs(limit, level, source);
     };
 
-    // Escuchar el evento de conexión
-    const unsubscribeConn = webSocketService.on('connection:status', ({ connected }) => {
+    // Escuchar el evento de conexión establecida
+    const unsubscribe = webSocketService.on('connection:status', ({ connected }) => {
       if (connected) {
-        requestLogs();
+        // Pequeño delay para asegurar que el socket está listo
+        setTimeout(() => {
+          requestLogs();
+        }, 100);
       }
     });
 
@@ -256,9 +271,10 @@ export function useLogs(limit = 50, level = null, source = null) {
       requestLogs();
     }
 
-    return unsubscribeConn;
-  }, [fetchLogs]);
+    return unsubscribe;
+  }, [limit, level, source]);
 
+  // Listener para log:list response
   useEffect(() => {
     const unsubscribe = webSocketService.on('log:list', (response) => {
       if (response.success) {
