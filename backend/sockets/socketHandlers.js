@@ -148,8 +148,7 @@ function setupSocketHandlers(ioInstance, esp32Token, evaluateSensorRulesFn) {
           ? data.external_humidity
           : data.humidity;
 
-        // Consulta a Open-Meteo solo si el cache está vencido
-        const fetch = require('node-fetch');
+        // Consulta a Open-Meteo solo si el cache está vencido (usar fetch nativo de Node 18+)
         const LAT_LA_PLATA = -34.9214;
         const LON_LA_PLATA = -57.9544;
         let climateCache = io.climateCache || { value: null, error: null, timestamp: 0 };
