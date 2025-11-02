@@ -77,9 +77,19 @@ jobs:
               # 2. Git pull
               echo "📥 Paso 2: Actualizando repositorio..."
               cd "$PROJECT_DIR"
-              CURRENT_COMMIT=$(git rev-parse HEAD)
-              git pull origin main --ff-only
+              
+              # Verificar que es un repositorio git válido
+              if [ ! -d ".git" ]; then
+                echo "⚠️  Directorio .git no encontrado, reinitializando repositorio..."
+                git init
+                git remote add origin https://github.com/reimonlp/greenhouse.git
+              fi
+              
+              CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+              git fetch origin main
+              git reset --hard origin/main
               NEW_COMMIT=$(git rev-parse HEAD)
+              
               if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
                 echo "⚠️  No hay cambios nuevos (ya estaba al día)"
               else
