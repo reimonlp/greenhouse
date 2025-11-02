@@ -1,0 +1,136 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 
+          script: |
+            set -e
+            
+            PROJECT_DIR="/home/rei/greenhouse"
+            BACKUP_DIR="/home/rei/greenhouse-backup"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            DEPLOY_LOG="/tmp/deploy_${TIMESTAMP}.log"
+            
+            {
+              echo "🚀 ===== DEPLOYMENT INICIADO ====="
+              echo "Timestamp: $TIMESTAMP"
+              echo "Proyecto: $PROJECT_DIR"
+              echo ""
+              
+              # 1. Crear backup del estado actual (excluyendo node_modules, dist, logs)
+              echo "📦 Paso 1: Creando backup..."
+              if [ -d "$BACKUP_DIR" ]; then
+                rm -rf "$BACKUP_DIR"
+              fi
+              rsync -av --exclude='node_modules' --exclude='dist' --exclude='logs' --exclude='.git' "$PROJECT_DIR/" "$BACKUP_DIR/"
+              echo "✅ Backup completado: $BACKUP_DIR"
+              echo ""
+              
+              # 2. Git pull
+              echo "📥 Paso 2: Actualizando repositorio..."
+              cd "$PROJECT_DIR"
+              CURRENT_COMMIT=$(git rev-parse HEAD)
+              git pull origin main --ff-only
+              NEW_COMMIT=$(git rev-parse HEAD)
+              if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
+                echo "⚠️  No hay cambios nuevos (ya estaba al día)"
+              else
+                echo "✅ Git pull completado"
+                echo "   Commit anterior: ${CURRENT_COMMIT:0:7}"
+                echo "   Commit nuevo: ${NEW_COMMIT:0:7}"
+              fi
+              echo ""
+              
+              # 3. Validar configuración Docker
+              echo "🔍 Paso 3: Validando docker-compose.prod.yml..."
+              docker compose -f docker-compose.prod.yml config > /dev/null
+              echo "✅ Configuración validada"
+              echo ""
+              
+              # 4. Reiniciar backend (sin MongoDB)
+              echo "🔄 Paso 4: Reiniciando backend..."
+              docker compose -f docker-compose.prod.yml up -d app 2>&1 | tee -a "$DEPLOY_LOG"
+              echo "✅ Backend reiniciado"
+              echo ""
+              
+              # 5. Reiniciar frontend (Nginx)
+              echo "🔄 Paso 5: Reiniciando frontend (Nginx)..."
+              docker compose -f docker-compose.prod.yml up -d web 2>&1 | tee -a "$DEPLOY_LOG"
+              echo "✅ Frontend reiniciado"
+              echo ""
+              
+              # 6. Health checks (con reintentos)
+              echo "🏥 Paso 6: Verificando salud de servicios..."
+              MAX_RETRIES=5
+              RETRY=0
+              HEALTH_OK=false
+              
+              while [ $RETRY -lt $MAX_RETRIES ]; do
+                # Health check a través de Nginx en el host
+                if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
+                  echo "✅ Backend health check PASSED (vía Nginx)"
+                  HEALTH_OK=true
+                  break
+                else
+                  RETRY=$((RETRY + 1))
+                  if [ $RETRY -lt $MAX_RETRIES ]; then
+                    echo "⏳ Reintento $RETRY/$MAX_RETRIES en 3s..."
+                    sleep 3
+                  fi
+                fi
+              done
+              
+              if [ "$HEALTH_OK" = false ]; then
+                echo "❌ Backend health check FALLÓ después de $MAX_RETRIES intentos"
+                echo "🔙 Iniciando rollback..."
+                
+                # Rollback: restaurar desde backup
+                cd /home/rei
+                rm -rf "$PROJECT_DIR"
+                cp -r "$BACKUP_DIR" "$PROJECT_DIR"
+                cd "$PROJECT_DIR"
+                
+                # Reiniciar con versión anterior
+                docker compose -f docker-compose.prod.yml down app web
+                docker compose -f docker-compose.prod.yml up -d app web
+                
+                sleep 5
+                if curl -sf https://reimon.dev/health > /dev/null 2>&1; then
+                  echo "✅ Rollback completado - servicios restaurados"
+                else
+                  echo "❌ CRÍTICO: Rollback falló - revisar manualmente"
+                  exit 1
+                fi
+              fi
+              echo ""
+              
+              # 7. Limpiar backup si todo OK
+              echo "🧹 Paso 7: Limpiando..."
+              rm -rf "$BACKUP_DIR"
+              echo "✅ Backup temporal eliminado"
+              echo ""
+              
+              # 8. Resumen final
+              echo "✨ ===== DEPLOYMENT COMPLETADO ====="
+              echo "Estado: EXITOSO"
+              echo "Servicios activos:"
+              docker compose -f docker-compose.prod.yml ps
+              echo ""
+              echo "Logs disponibles en: $DEPLOY_LOG"
+              
+            } 2>&1 | tee "$DEPLOY_LOG"
+            
+            # Guardar log en carpeta accesible
+            cp "$DEPLOY_LOG" "$PROJECT_DIR/logs/deploy_${TIMESTAMP}.log" 2>/dev/null || true
