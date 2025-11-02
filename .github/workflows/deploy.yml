@@ -94,7 +94,6 @@ jobs:
               
               # 4. Reemplazar proyecto actual
               echo "🔄 Paso 4: Activando nuevo código..."
-              cd /home/rei
               
               # Limpiar directorio anterior si existe
               if [ -d "$PROJECT_DIR.old" ]; then
@@ -108,6 +107,7 @@ jobs:
               
               # Activar nuevo código
               mv "$PROJECT_TMP" "$PROJECT_DIR"
+              cd "$PROJECT_DIR"
               echo "✅ Código actualizado"
               echo ""
               
@@ -150,7 +150,6 @@ jobs:
                 echo "🔙 Iniciando rollback..."
                 
                 # Rollback: restaurar versión anterior
-                cd /home/rei
                 docker compose -f "$PROJECT_DIR/docker/docker-compose.prod.yml" down app 2>/dev/null || true
                 sudo rm -rf "$PROJECT_DIR"
                 [ -d "$PROJECT_DIR.old" ] && mv "$PROJECT_DIR.old" "$PROJECT_DIR"
@@ -177,6 +176,7 @@ jobs:
               echo "✨ ===== DEPLOYMENT COMPLETADO ====="
               echo "Estado: EXITOSO"
               echo "Servicios activos:"
+              cd "$PROJECT_DIR"
               docker compose -f docker/docker-compose.prod.yml ps
               echo ""
               echo "Logs guardados en: $DEPLOY_LOG"
