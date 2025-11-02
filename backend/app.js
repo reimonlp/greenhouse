@@ -1,12 +1,10 @@
 require('dotenv').config();
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
 
 // Import modules
+const { setupCorsAndSecurity } = require('./middleware/cors-security');
+const { setupFrontendRoutes } = require('./middleware/frontend-routes');
+const { createServer, setupSocketIO, startServer, setupGracefulShutdown } = require('./lib/server-setup');
 const { checkSocketRateLimit, socketRateLimits } = require('./middleware/rateLimiter');
 const { setupSocketHandlers } = require('./sockets/socketHandlers');
 const { setupHealthCheck } = require('./routes/health');
@@ -22,13 +20,6 @@ if (!ESP32_AUTH_TOKEN || ESP32_AUTH_TOKEN.length < 32) {
     process.exit(1);
 }
 
-// Silent token loading - no log noise
-
-const SensorReading = require('./models/SensorReading');
-const RelayState = require('./models/RelayState');
-const Rule = require('./models/Rule');
-const SystemLog = require('./models/SystemLog');
-
 // Rule engine functions (if ruleEngine.js exists)
 let evaluateSensorRules = async () => {};
 let evaluateTimeRules = async () => {};
@@ -43,68 +34,19 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ====== Middleware ======
-app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*'
-}));
-app.use(express.json());
+// ====== Setup Middleware ======
+setupCorsAndSecurity(app);
 
-// ====== Crear servidor HTTP ======
-const server = http.createServer(app);
+// ====== Create HTTP Server ======
+const server = createServer(app);
 
-// ====== Configurar Socket.IO ======
-const io = new Server(server, {
-  cors: {
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || "*",
-    methods: ["GET", "POST"],
-    credentials: true
-  },
-  path: '/socket.io/',
-  // In production behind Nginx proxy at /greenhouse/socket.io/
-  // The browser sees /greenhouse/socket.io/ but needs to work both locally and on VPS
-  transports: ['websocket', 'polling']
-});
+// ====== Setup Socket.IO ======
+const io = setupSocketIO(server);
 
-// Custom morgan format to log real IP addresses
-morgan.token('real-ip', (req) => {
-  return req.ip || req.connection.remoteAddress;
-});
-app.use(morgan(':real-ip - :method :url :status :res[content-length] - :response-time ms'));
-
-// Trust proxy - necesario para obtener IP real detrás de nginx
-app.set('trust proxy', true);
-
-// ====== Setup Socket Handlers ======
+// ====== Setup Routes & Handlers ======
 setupSocketHandlers(io, ESP32_AUTH_TOKEN, evaluateSensorRules);
-
-// ====== Setup Health Check ======
 setupHealthCheck(app, io, socketRateLimits);
-
-// ====== Static Frontend Files ======
-// Serve static files from the frontend build directory
-const path = require('path');
-const frontendPath = path.join(__dirname, '../frontend/dist');
-
-// Serve static files (CSS, JS, images, etc.)
-// The frontend is built with base: '/greenhouse/', so we need to serve it correctly
-app.use('/greenhouse/assets', express.static(path.join(frontendPath, 'assets')));
-app.use('/greenhouse/favicon.svg', express.static(path.join(frontendPath, 'favicon.svg')));
-
-// Also serve without /greenhouse prefix for direct backend access (local dev)
-app.use('/assets', express.static(path.join(frontendPath, 'assets')));
-app.use('/favicon.svg', express.static(path.join(frontendPath, 'favicon.svg')));
-
-// Serve the main React app for all non-API routes
-app.get('*', (req, res, next) => {
-  // Skip health check and API routes
-  if (req.path.startsWith('/socket.io/') || req.path === '/health' || req.path.startsWith('/api/')) {
-    return next();
-  }
-  
-  // Serve index.html for all other routes (React Router)
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
+setupFrontendRoutes(app);
 
 // ====== Connect to Database ======
 connectDatabase();
@@ -112,19 +54,10 @@ connectDatabase();
 // ====== Time-based Rules Scheduler ======
 setInterval(async () => {
   await evaluateTimeRules();
-}, 60000); // Cada minuto
-
-// Silent scheduler start - no log noise
+}, 60000); // Every minute
 
 // ====== Start Server ======
-server.listen(PORT, () => {
-  // Silent server start - no log noise
-});
+startServer(server, PORT);
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM recibido, cerrando servidor...');
-  io.close();
-  require('mongoose').connection.close();
-  process.exit(0);
-});
+// ====== Graceful Shutdown ======
+setupGracefulShutdown(server, io);
