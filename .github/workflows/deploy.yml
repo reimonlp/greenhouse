@@ -37,9 +37,7 @@ jobs:
               echo "🔐 Paso 0: Configurando variables de entorno..."
               
               # Crear .env.production en raíz
-              cat > "$PROJECT_DIR/.env.production" <<EOF
-${{ secrets.ENV_PRODUCTION }}
-EOF
+              echo '${{ secrets.ENV_PRODUCTION }}' > "$PROJECT_DIR/.env.production"
               
               # Crear backend/.env (mismo contenido)
               mkdir -p "$PROJECT_DIR/backend"
