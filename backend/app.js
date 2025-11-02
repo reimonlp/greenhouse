@@ -20,16 +20,8 @@ if (!ESP32_AUTH_TOKEN || ESP32_AUTH_TOKEN.length < 32) {
     process.exit(1);
 }
 
-// Rule engine functions (if ruleEngine.js exists)
-let evaluateSensorRules = async () => {};
-let evaluateTimeRules = async () => {};
-try {
-  const ruleEngine = require('./ruleEngine');
-  evaluateSensorRules = ruleEngine.evaluateSensorRules || evaluateSensorRules;
-  evaluateTimeRules = ruleEngine.evaluateTimeRules || evaluateTimeRules;
-} catch (err) {
-  // Silent warning - rule evaluation disabled if ruleEngine.js not found
-}
+// Rule engine functions for automation
+const { evaluateSensorRules, evaluateTimeRules } = require('./lib/ruleEngine');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
