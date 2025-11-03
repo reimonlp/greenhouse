@@ -55,9 +55,11 @@ Backend → Frontend (WEBSOCKET ONLY):
 - TTL index is **automatic** - MongoDB deletes expired docs in background
 
 ### Relay Control Convention
-- **IDs**: 0=Lights, 1=Fan, 2=Pump, 3=Heater (mapped in `sockets/socketHandlers.js` RELAY_NAMES)
-- **Modes**: `manual` (dashboard), `auto` (rule-triggered), `rule` (time-based)
+- **IDs**: 0=Lights, 1=Fan, 2=Pump, 3=Heater (mapped in `lib/ruleEngine.js` RELAY_NAMES)
+- **Modes**: `manual` (user-controlled via dashboard), `auto` (ready for rule execution)
+- **Manual mode protection**: When relay is in 'manual' mode, rules will NOT execute
 - State tracked in MongoDB with `timestamp`, `mode`, `changed_by`
+- Changed_by values: 'user' (dashboard), 'rule' (automation), 'system' (initialization)
 
 ### WebSocket Events (Complete Reference)
 
@@ -111,16 +113,23 @@ Backend → Frontend (WEBSOCKET ONLY):
   - `sockets/socketHandlers.js` - All WebSocket event handlers
   - `models/` - MongoDB schemas (SensorReading, RelayState, Rule, SystemLog)
   - `config/database.js` - MongoDB connection
-- **Rule Engine** (`lib/ruleEngine.js`):
-  - `evaluateSensorRules(sensorReading)` - Triggered on new sensor data
+- **Rule Engine** (`lib/ruleEngine.js`, 245 lines):
+  - `evaluateSensorRules(sensorReading, io)` - Triggered on new sensor data
     - Evaluates all enabled sensor-based rules
     - Conditions: temperature, humidity, soil_moisture with operators (>, <, >=, <=, ==)
     - Actions: turn_on, turn_off via relay_id (0=Lights, 1=Fan, 2=Pump, 3=Heater)
-    - Saves RelayState to MongoDB with mode='rule'
-  - `evaluateTimeRules()` - Runs every 60 seconds
-    - Evaluates time-based rules at scheduled times
+    - **Manual mode protection**: Skips rule execution if relay mode='manual'
+    - Saves RelayState to MongoDB with mode='auto', changed_by='rule'
+    - Broadcasts 'relay:command' to ESP32 and 'relay:changed' to all clients
+  - `evaluateTimeRules(io)` - Runs every 60 seconds
+    - Evaluates time-based rules at scheduled times using Argentina timezone (UTC-3)
     - Supports specific days of week (0=Sunday, 6=Saturday)
-    - Automatic relay control with full audit trail
+    - **Manual mode protection**: Skips execution if relay in 'manual' mode
+    - Automatic relay control with full audit trail to SystemLog
+  - `executeRelayAction(relayId, state, mode, changedBy, io)` - Execute relay change
+    - Creates RelayState document with timestamp and audit info
+    - Logs action to SystemLog for full history
+    - Broadcasts to ESP32 devices and all connected clients
 - Rate limiter: `middleware/rateLimiter.js` (120 events/min per socket)
 - Logs: `docker compose logs -f app` (when in containers)
 
@@ -321,9 +330,11 @@ const wsUrl = import.meta.env.DEV
 4. Dashboard `SensorCard.jsx` reads `latestSensor` from hook; add new chart in `SensorChart.jsx`
 
 ### Relay State Changes
-- Always broadcast via WebSocket after DB save (see `socketHandlers.js` `relay:command` handler)
+- Always broadcast via WebSocket after DB save (see `lib/ruleEngine.js` `executeRelayAction()`)
 - Both ESP32 and dashboard listen for `relay:changed` events
-- Mode tracking (manual/auto/rule) is critical for rule engine
+- Mode tracking (manual/auto) is critical for rule engine protection
+- Manual mode: User has full control; rules are disabled
+- Auto mode: Rules can execute; user can still toggle switches
 
 ### MongoDB Connection Issues
 - Local dev: ensure MongoDB container is healthy (`docker compose ps`)
@@ -398,6 +409,11 @@ docker compose down -v                       # Stop and remove volumes
 - **Scalability**: Single persistent connection per client
 - **Build**: 0 errors
 - **Project Structure**: Clean and organized
+- **Relay Modes**: Manual (user control) and Auto (rules enabled) fully working
+- **Manual Mode Protection**: Rules automatically skip execution when relay in 'manual' mode
+- **Frontend UI**: Relay switch hidden in 'auto' mode, visible in 'manual' mode
+- **Logging**: Clean production output (verbose debug logs removed from rule engine)
+- **Database**: MongoDB TTL auto-cleanup, auto-initialization of relay states on startup
 
 ## Key Reminders
 
