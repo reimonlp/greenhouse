@@ -17,10 +17,10 @@ const RELAY_NAMES = {
   1: 'Fan',
   2: 'Pump',
   3: 'Heater'
-};
+};  
 
 /**
- * Evaluate sensor-based rules
+ * Evaluate sensor-based rules 
  * Called when new sensor data arrives from ESP32
  * 
  * @param {Object} sensorReading - Latest sensor data {temperature, humidity, soil_moisture}
@@ -33,47 +33,39 @@ async function evaluateSensorRules(sensorReading, io) {
     const sensorRules = await Rule.find({
       enabled: true,
       rule_type: 'sensor'
-    }).lean();
-
-    console.log(`🔍 [RULES] Checking ${sensorRules.length} sensor-based rules`);
-    console.log(`📊 [SENSOR] Temp: ${sensorReading.temperature}°C, Humidity: ${sensorReading.humidity}%, Soil: ${sensorReading.soil_moisture}%`);
+    }).lean();  
 
     if (sensorRules.length === 0) {
-      console.log(`⚪ [RULES] No sensor-based rules found`);
       return;
-    }
+    }  
 
     for (const rule of sensorRules) {
       const { condition, action, relay_id } = rule;
       
+      // Check if relay is in 'auto' mode before executing
+      const relayState = await RelayState.findOne({ relay_id }).lean();
+      if (relayState && relayState.mode === 'manual') {
+        continue;
+      }
+
       if (!condition || !condition.sensor || !condition.operator || condition.threshold === undefined) {
         console.warn(`⚠️  [WARN] Invalid sensor rule condition: ${rule._id}`);
         continue;
-      }
+      }  
 
       // Get sensor value
       const sensorValue = sensorReading[condition.sensor];
       if (sensorValue === undefined) {
         console.warn(`⚠️  [WARN] Sensor "${condition.sensor}" not found in reading`);
         continue;
-      }
+      }  
 
       // Evaluate condition
       const conditionMet = evaluateCondition(sensorValue, condition.operator, condition.threshold);
-      console.log(`  📋 Rule: ${rule.name || rule._id.toString().substring(0, 8)}... | Sensor: ${condition.sensor}=${sensorValue} ${condition.operator} ${condition.threshold} | Result: ${conditionMet}`);
       
       if (conditionMet) {
         const actionState = action === 'turn_on' || action === 'on';
-        console.log(`✅ [RULE] Sensor rule TRIGGERED: ${rule.name || `Rule ${rule._id}`}`);
-        console.log(`   Sensor: ${condition.sensor}, Value: ${sensorValue}, Operator: ${condition.operator}, Threshold: ${condition.threshold}`);
-        console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
-
-        // Check if relay is in 'auto' mode before executing
-        const relayState = await RelayState.findOne({ relay_id }).lean();
-        if (relayState && relayState.mode === 'manual') {
-          console.log(`⛔ [RULE] Relay ${relay_id} is in MANUAL mode - rule not executed`);
-          continue;
-        }
+        console.log(`✅ [RULE] Sensor rule triggered: ${rule.name || rule._id}`);
 
         // Execute the action
         await executeRelayAction(relay_id, actionState, 'auto', 'rule', io);
@@ -99,10 +91,7 @@ async function evaluateTimeRules(io) {
       rule_type: 'time'
     }).lean();
 
-    console.log(`🔍 [RULES] Checking ${timeRules.length} time-based rules`);
-
     if (timeRules.length === 0) {
-      console.log(`⚪ [RULES] No time-based rules found`);
       return;
     }
 
@@ -117,35 +106,32 @@ async function evaluateTimeRules(io) {
 
     for (const rule of timeRules) {
       const { schedule, action, relay_id } = rule;
-
+      
+      // Check if relay is in 'auto' mode before executing
+      const relayState = await RelayState.findOne({ relay_id }).lean();
+      if (relayState && relayState.mode === 'manual') {
+        continue;
+      }
+  
       if (!schedule || !schedule.time) {
         console.warn(`⚠️  [WARN] Invalid time rule schedule: ${rule._id}`);
         continue;
-      }
+      }  
 
       // Check if time matches
       if (schedule.time !== currentTime) {
         continue;
-      }
+      }  
 
       // Check if day matches (if days are specified)
       const ruleDays = schedule.days && schedule.days.length > 0 ? schedule.days : [0, 1, 2, 3, 4, 5, 6];
       if (!ruleDays.includes(dayOfWeek)) {
         continue;
-      }
-
+      }  
+      
       // Time and day match - execute action
       const actionState = action === 'turn_on' || action === 'on';
-      console.log(`✅ [RULE] Time rule triggered: ${rule.name || `Rule ${rule._id}`}`);
-      console.log(`   Scheduled time: ${schedule.time}, Day: ${dayOfWeek}, Action: ${action}`);
-      console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
-
-      // Check if relay is in 'auto' mode before executing
-      const relayState = await RelayState.findOne({ relay_id }).lean();
-      if (relayState && relayState.mode === 'manual') {
-        console.log(`⛔ [RULE] Relay ${relay_id} is in MANUAL mode - rule not executed`);
-        continue;
-      }
+      console.log(`✅ [RULE] Time rule triggered: ${rule.name || rule._id}`);
 
       // Execute the action
       await executeRelayAction(relay_id, actionState, 'auto', 'rule', io);
@@ -210,8 +196,6 @@ async function executeRelayAction(relayId, state, mode = 'auto', changedBy = 'sy
       timestamp: new Date()
     });
 
-    console.log(`✅ [DB] Relay state saved successfully: ${relayState._id}`);
-
     // Log the action
     await SystemLog.create({
       event_type: 'relay_change',
@@ -227,7 +211,6 @@ async function executeRelayAction(relayId, state, mode = 'auto', changedBy = 'sy
 
     // Broadcast relay:command to ESP32 devices (same as dashboard command)
     if (io) {
-      console.log(`📡 [BROADCAST] Sending relay:command to ESP32 devices`);
       io.to('esp32_devices').emit('relay:command', {
         relay_id: relayId,
         state: state,
@@ -235,14 +218,10 @@ async function executeRelayAction(relayId, state, mode = 'auto', changedBy = 'sy
         changed_by: changedBy,
         timestamp: new Date()
       });
-      console.log(`📡 [BROADCAST] relay:command sent to ESP32 devices`);
-    } else {
-      console.warn(`⚠️  [WARN] No io instance available, cannot broadcast relay:command`);
     }
 
     // Broadcast relay state change to all connected clients (dashboard)
     if (io) {
-      console.log(`📡 [BROADCAST] Sending relay:changed to all clients`);
       io.emit('relay:changed', {
         relay_id: relayId,
         state: state,
