@@ -68,6 +68,13 @@ async function evaluateSensorRules(sensorReading, io) {
         console.log(`   Sensor: ${condition.sensor}, Value: ${sensorValue}, Operator: ${condition.operator}, Threshold: ${condition.threshold}`);
         console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
 
+        // Check if relay is in 'auto' mode before executing
+        const relayState = await RelayState.findOne({ relay_id }).lean();
+        if (relayState && relayState.mode === 'manual') {
+          console.log(`⛔ [RULE] Relay ${relay_id} is in MANUAL mode - rule not executed`);
+          continue;
+        }
+
         // Execute the action
         await executeRelayAction(relay_id, actionState, 'auto', 'rule', io);
       }
@@ -132,6 +139,13 @@ async function evaluateTimeRules(io) {
       console.log(`✅ [RULE] Time rule triggered: ${rule.name || `Rule ${rule._id}`}`);
       console.log(`   Scheduled time: ${schedule.time}, Day: ${dayOfWeek}, Action: ${action}`);
       console.log(`   Action: ${action} (Relay ${relay_id} - ${RELAY_NAMES[relay_id] || 'Unknown'})`);
+
+      // Check if relay is in 'auto' mode before executing
+      const relayState = await RelayState.findOne({ relay_id }).lean();
+      if (relayState && relayState.mode === 'manual') {
+        console.log(`⛔ [RULE] Relay ${relay_id} is in MANUAL mode - rule not executed`);
+        continue;
+      }
 
       // Execute the action
       await executeRelayAction(relay_id, actionState, 'auto', 'rule', io);
