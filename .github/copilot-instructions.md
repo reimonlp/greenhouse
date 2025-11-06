@@ -107,11 +107,19 @@ Backend → Frontend (WEBSOCKET ONLY):
 - Monitor: `pio device monitor --baud 115200` (USB JTAG console output)
 - Serial output: Use `printf("message\n"); fflush(stdout);` instead of Serial
 
+**OTA (Over-The-Air) Updates**:
+- Hostname: `greenhouse-esp32c3.local` (via mDNS)
+- Port: 3232 (standard ArduinoOTA port)
+- Security: Protected with WiFi password (set in `secrets.h`)
+- Upload during runtime: No physical USB access needed
+- Watchdog: Temporarily disabled during OTA, re-enabled on error
+- Example: `pio run --target upload --upload-port greenhouse-esp32c3.local`
+
 **General Firmware Notes**:
 - Template secrets: `cp include/secrets.example.h include/secrets.h` → edit
 - Key headers: `config.h` (debug mode, timeouts), `vps_websocket.h` (connection logic)
 - **Note**: All sensor/relay communication via WebSocket `sensor:data`, `relay:state` events
-- Flash size: 69.8% used (914KB of 1.3MB) with minimal WebSocket build
+- Flash size: 72.9% used (955KB of 1.3MB) with WebSocket + OTA support
 
 **Backend Development** (`backend/`):
 - Start: `npm start` (reads `.env`, validates ESP32_AUTH_TOKEN)
@@ -446,7 +454,8 @@ docker compose down -v                       # Stop and remove volumes
 3. **Flash Configuration**
    - **Problem**: OTA partitions causing size issues and boot failures
    - **Solution**: Simplified to single-app partition layout (removed dual OTA)
-   - **Result**: 69.8% flash used (914KB), clean and efficient
+   - **Result**: Now using 72.9% flash (955KB) with integrated ArduinoOTA support
+   - **OTA Re-enabled**: Proper lifecycle management with watchdog control during updates
 
 ### Key Configuration Flags
 
@@ -477,6 +486,31 @@ docker compose down -v                       # Stop and remove volumes
    - ESP32-C3 has 30-second watchdog timeout
    - Feed it regularly: `esp_task_wdt_reset()`
    - Disable/enable around OTA operations
+
+### OTA Implementation Details
+
+**Current Implementation** (main.cpp):
+- `setupOTA()`: Initializes ArduinoOTA with mDNS hostname and password protection
+- `ArduinoOTA.handle()`: Placed in loop after `esp_task_wdt_reset()` for responsive updates
+- Callbacks:
+  - `onStart()`: Disables watchdog to prevent reset during update
+  - `onEnd()`: Confirmation message
+  - `onProgress()`: Progress reporting every 10%
+  - `onError()`: Re-enables watchdog and logs error type
+
+**Security**:
+- OTA password matches WiFi password (from `secrets.h`)
+- mDNS hostname: `greenhouse-esp32c3.local`
+- OTA port: 3232 (standard ArduinoOTA port)
+
+**Usage**:
+```bash
+# Via PlatformIO
+pio run --target upload --upload-port greenhouse-esp32c3.local
+
+# Via Arduino IDE
+- Tools → Port → network port (greenhouse-esp32c3.local)
+```
 
 ### Hardware Verification Checklist
 
