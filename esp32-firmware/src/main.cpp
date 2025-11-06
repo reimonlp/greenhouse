@@ -1,15 +1,18 @@
-// ESP32 Greenhouse - WebSocket Real-Time Communication
+// ESP32-C3 Greenhouse - WebSocket Real-Time Communication
+// 
+// Notes for ESP32-C3 USB JTAG:
+// - Uses printf() instead of Serial.println() (prints to USB JTAG)
+// - Must use fflush(stdout) after printf to ensure output
+// - CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG enabled in platformio.ini
 
 #include <Arduino.h>
+#include <stdio.h>
 #include <WiFi.h>
 #include <time.h>
 #include <esp_task_wdt.h>
-#include <ArduinoOTA.h>
 #include "config.h"
 #include "vps_config.h"
-#include "vps_client.h"
 #include "vps_websocket.h"
-#include "ota.h"
 #include "sensors.h"
 #include "relays.h"
 #include "secrets.h"
@@ -21,7 +24,6 @@ extern SensorManager sensors;
 extern RelayManager relays;
 
 // Global instances
-VPSClient vpsClient;
 VPSWebSocketClient vpsWebSocket;
 
 // Timers
@@ -44,7 +46,8 @@ void onRelayCommand(int relayId, bool state) {
 }
 
 void onSensorRequestReceived() {
-    DEBUG_PRINTLN("\n=== Sensor Request from WebSocket ===");
+    printf("\n=== Sensor Request from WebSocket ===\n");
+    fflush(stdout);
     sendSensorData();
 }
 
@@ -58,7 +61,8 @@ void onSensorRequestReceived() {
  * - Restarts ESP32 if connection fails (critical for operation)
  */
 void setupWiFi() {
-    DEBUG_PRINTLN("Connecting to WiFi...");
+    printf("Connecting to WiFi...\n");
+    fflush(stdout);
     // Don't log SSID for security (prevents network name disclosure)
     
     WiFi.mode(WIFI_STA);
@@ -67,7 +71,8 @@ void setupWiFi() {
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 30) {
         delay(WIFI_CONNECT_DELAY_MS);
-        DEBUG_PRINT(".");
+        printf(".");
+        fflush(stdout);
         attempts++;
         if (attempts % 5 == 0) {
             esp_task_wdt_reset(); // Feed watchdog every 2.5 seconds during WiFi connection
@@ -75,15 +80,14 @@ void setupWiFi() {
     }
     
     if (WiFi.status() == WL_CONNECTED) {
-        DEBUG_PRINTLN("\n[OK] WiFi connected");
-        DEBUG_PRINT("IP address: ");
-        DEBUG_PRINTLN(WiFi.localIP());
-        DEBUG_PRINT("Signal strength: ");
-        DEBUG_PRINT(WiFi.RSSI());
-        DEBUG_PRINTLN(" dBm");
+        printf("\n[OK] WiFi connected\n");
+        printf("IP address: %s\n", WiFi.localIP().toString().c_str());
+        printf("Signal strength: %d dBm\n", WiFi.RSSI());
+        fflush(stdout);
     } else {
-        DEBUG_PRINTLN("\n✗ WiFi connection failed!");
-        DEBUG_PRINTLN("Restarting in 5 seconds...");
+        printf("\n✗ WiFi connection failed!\n");
+        printf("Restarting in 5 seconds...\n");
+        fflush(stdout);
         delay(WIFI_FAILED_RESTART_DELAY_MS);
         ESP.restart();
     }
@@ -99,22 +103,28 @@ void setupWiFi() {
  * - Critical for data logging and rule evaluation
  */
 void setupNTP() {
-    DEBUG_PRINTLN("Syncing time...");
+    printf("Syncing time...\n");
+    fflush(stdout);
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
     
     struct tm timeinfo;
     int attempts = 0;
     while (!getLocalTime(&timeinfo) && attempts < 10) {
-        DEBUG_PRINT(".");
+        printf(".");
+        fflush(stdout);
         delay(NTP_SYNC_RETRY_DELAY_MS);
         attempts++;
     }
     
     if (attempts < 10) {
-        DEBUG_PRINTLN("[OK] Time synchronized");
-        DEBUG_PRINTLN(&timeinfo, "%Y-%m-%d %H:%M:%S");
+        printf("[OK] Time synchronized\n");
+        char buffer[80];
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        printf("%s\n", buffer);
+        fflush(stdout);
     } else {
-        DEBUG_PRINTLN("[WARN] Time sync failed");
+        printf("[WARN] Time sync failed\n");
+        fflush(stdout);
     }
 }
 
@@ -128,81 +138,20 @@ void checkVPSHealth() {
     
     if (vpsConnected) {
         failedRequests = 0;
-        DEBUG_PRINTLN("[OK] WebSocket connected - system healthy");
+        printf("[OK] WebSocket connected - system healthy\n");
+        fflush(stdout);
     } else {
         failedRequests++;
-        DEBUG_PRINTF("⚠ WebSocket disconnected (%d/%d)\n", failedRequests, MAX_FAILED_REQUESTS);
+        printf("⚠ WebSocket disconnected (%d/%d)\n", failedRequests, MAX_FAILED_REQUESTS);
+        fflush(stdout);
         
         if (failedRequests >= MAX_FAILED_REQUESTS) {
-            DEBUG_PRINTLN("⚠ WebSocket disconnected for too long, restarting...");
+            printf("⚠ WebSocket disconnected for too long, restarting...\n");
+            fflush(stdout);
             delay(5000);
             ESP.restart();
         }
     }
-}
-
-void setupOTA() {
-#if OTA_ENABLED
-    DEBUG_PRINTLN("Setting up OTA...");
-    
-    // Set hostname
-    ArduinoOTA.setHostname(OTA_HOSTNAME);
-    
-    // Set OTA port
-    ArduinoOTA.setPort(OTA_PORT);
-    
-    // Set password for security
-    ArduinoOTA.setPassword(OTA_PASSWORD);
-    
-    // OTA callbacks for monitoring
-    ArduinoOTA.onStart([]() {
-        String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-        DEBUG_PRINTLN("\n[OTA] Update Started: " + type);
-        // Disable watchdog during OTA update
-        esp_task_wdt_delete(NULL);
-    });
-    
-    ArduinoOTA.onEnd([]() {
-        DEBUG_PRINTLN("\n[OTA] Update Completed");
-    });
-    
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        static unsigned int lastPercent = 0;
-        unsigned int percent = (progress / (total / 100));
-        if (percent != lastPercent && percent % 10 == 0) {
-            DEBUG_PRINTF("OTA Progress: %u%%\n", percent);
-            lastPercent = percent;
-        }
-    });
-    
-    ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("[ERROR] OTA Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) {
-            Serial.println("Auth Failed");
-        } else if (error == OTA_BEGIN_ERROR) {
-            Serial.println("Begin Failed");
-        } else if (error == OTA_CONNECT_ERROR) {
-            Serial.println("Connect Failed");
-        } else if (error == OTA_RECEIVE_ERROR) {
-            Serial.println("Receive Failed");
-        } else if (error == OTA_END_ERROR) {
-            Serial.println("End Failed");
-        }
-        
-        // Re-enable watchdog after failed OTA
-        esp_task_wdt_add(NULL);
-    });
-    
-    ArduinoOTA.begin();
-    DEBUG_PRINTLN("[OK] OTA Ready");
-    DEBUG_PRINT("  Hostname: ");
-    DEBUG_PRINTLN(OTA_HOSTNAME);
-    DEBUG_PRINT("  Port: ");
-    DEBUG_PRINTLN(OTA_PORT);
-    DEBUG_PRINTLN("  Password: ********");
-#else
-    DEBUG_PRINTLN("⚠ OTA disabled in config");
-#endif
 }
 
 /**
@@ -223,7 +172,8 @@ void sendSensorData() {
     }
     lastSensorSend = millis();
     
-    DEBUG_PRINTLN("\n=== Sending Sensor Data ===");
+    printf("\n=== Sending Sensor Data ===\n");
+    fflush(stdout);
     
     sensors.readSensors();
     SensorData data = sensors.getCurrentData();
@@ -234,15 +184,20 @@ void sendSensorData() {
     int humErrors = sensors.getHumidityErrors();
     
     if (isnan(temp) || isnan(hum)) {
-        DEBUG_PRINTLN("✗ Invalid sensor readings, skipping");
+        printf("✗ Invalid sensor readings, skipping\n");
+        fflush(stdout);
         return;
     }
+    
+    printf("Temperature: %.2f°C, Humidity: %.2f%%\n", temp, hum);
+    fflush(stdout);
     
     bool success = vpsWebSocket.sendSensorData(temp, hum, data.soil_moisture, tempErrors, humErrors);
     
     if (!success) {
         failedRequests++;
-        DEBUG_PRINTF("Failed requests: %d/%d\n", failedRequests, MAX_FAILED_REQUESTS);
+        printf("Failed requests: %d/%d\n", failedRequests, MAX_FAILED_REQUESTS);
+        fflush(stdout);
     } else {
         failedRequests = 0;
     }
@@ -261,100 +216,111 @@ void sendMetrics() {
     
     ConnectionMetrics metrics = vpsWebSocket.getMetrics();
     
-    DEBUG_PRINTLN("\n=== Sending Connection Metrics ===");
-    DEBUG_PRINTF("Total Connections: %lu\n", metrics.totalConnections);
-    DEBUG_PRINTF("Reconnections: %lu\n", metrics.reconnections);
-    DEBUG_PRINTF("Auth Failures: %lu\n", metrics.authFailures);
-    DEBUG_PRINTF("Messages Sent: %lu\n", metrics.messagesSent);
-    DEBUG_PRINTF("Messages Received: %lu\n", metrics.messagesReceived);
-    DEBUG_PRINTF("Uptime: %lu seconds\n", metrics.uptimeSeconds);
+    printf("\n=== Sending Connection Metrics ===\n");
+    printf("Total Connections: %lu\n", metrics.totalConnections);
+    printf("Reconnections: %lu\n", metrics.reconnections);
+    printf("Messages Sent: %lu\n", metrics.messagesSent);
+    printf("Messages Received: %lu\n", metrics.messagesReceived);
+    printf("Uptime: %lu seconds\n", metrics.uptimeSeconds);
+    fflush(stdout);
     
     bool success = vpsWebSocket.sendMetrics(metrics);
     if (success) {
-        DEBUG_PRINTLN("[OK] Metrics sent");
+        printf("[OK] Metrics sent\n");
+        fflush(stdout);
     } else {
-        DEBUG_PRINTLN("[ERROR] Failed to send metrics");
+        printf("[ERROR] Failed to send metrics\n");
+        fflush(stdout);
     }
 }
 
 /**
- * @brief ESP32 initialization and startup sequence
+ * @brief ESP32-C3 initialization and startup sequence
  * 
  * Performs complete system initialization in the correct order:
- * 1. Serial communication setup
+ * 1. Serial communication setup (printf via USB JTAG)
  * 2. Watchdog timer configuration (critical for reliability)
  * 3. Hardware initialization (sensors, relays)
  * 4. Network setup (WiFi, NTP)
- * 5. VPS communication setup (WebSocket, OTA)
+ * 5. VPS communication setup (WebSocket)
  * 
  * This function must complete successfully for the system to operate.
  * Failure in any step may cause ESP32 restart or degraded operation.
  */
 void setup() {
-    DEBUG_SERIAL_BEGIN(115200);
     delay(SYSTEM_STARTUP_DELAY_MS);
     
-    DEBUG_PRINTLN("\n\n");
-    DEBUG_PRINTLN("╔══════════════════════════════════════════════╗");
-    DEBUG_PRINTLN("║  ESP32 Greenhouse - VPS Client Mode          ║");
-    DEBUG_PRINTLN("║  Firmware v2.3-ota - OTA Enabled             ║");
-    DEBUG_PRINTLN("╚══════════════════════════════════════════════╝");
-    DEBUG_PRINTLN();
+    printf("\n\n");
+    printf("╔══════════════════════════════════════════════╗\n");
+    printf("║  ESP32-C3 Greenhouse - WebSocket Client      ║\n");
+    printf("║  Firmware v3.0-c3 - Clean Build              ║\n");
+    printf("╚══════════════════════════════════════════════╝\n");
+    printf("\n");
+    fflush(stdout);
     
     // Configure and enable watchdog timer
-    DEBUG_PRINTLN("=== Initializing Watchdog Timer ===");
+    printf("=== Initializing Watchdog Timer ===\n");
     esp_task_wdt_init(WDT_TIMEOUT, true); // 30s timeout, panic on timeout
     esp_task_wdt_add(NULL); // Add current task to WDT watch
-    DEBUG_PRINTF("[OK] Watchdog enabled (%d seconds)\n", WDT_TIMEOUT);
+    printf("[OK] Watchdog enabled (%d seconds)\n", WDT_TIMEOUT);
+    fflush(stdout);
     
-    DEBUG_PRINTLN("\n=== Initializing Hardware ===");
+    printf("\n=== Initializing Hardware ===\n");
     relays.begin();
     sensors.begin();
-    DEBUG_PRINTLN("[OK] Hardware initialized");
+    printf("[OK] Hardware initialized\n");
+    fflush(stdout);
     
     setupWiFi();
     setupNTP();
-    setupOTA();
     
-    DEBUG_PRINTLN("\n=== Initializing WebSocket ===");
+    printf("\n=== Initializing WebSocket ===\n");
     vpsWebSocket.begin();
     
     vpsWebSocket.onRelayCommand(onRelayCommand);
     vpsWebSocket.onSensorRequest(onSensorRequestReceived);
     
-    DEBUG_PRINTLN("Waiting for WebSocket connection...");
+    printf("Waiting for WebSocket connection...\n");
+    fflush(stdout);
     int attempts = 0;
     while (!vpsWebSocket.isConnected() && attempts < 20) {
         vpsWebSocket.loop();
         delay(WS_CONNECTION_CHECK_DELAY_MS);
-        DEBUG_PRINT(".");
+        printf(".");
+        fflush(stdout);
         esp_task_wdt_reset(); // Feed watchdog during initialization
         attempts++;
     }
-    DEBUG_PRINTLN();
+    printf("\n");
+    fflush(stdout);
     
     if (vpsWebSocket.isConnected()) {
-        DEBUG_PRINTLN("[OK] WebSocket connected!");
+        printf("[OK] WebSocket connected!\n");
+        fflush(stdout);
         
-        vpsWebSocket.sendLog("info", "ESP32 Greenhouse started - WebSocket mode");
+        vpsWebSocket.sendLog("info", "ESP32-C3 Greenhouse started");
         
-        DEBUG_PRINTLN("\n=== Sending Initial Relay States ===");
+        printf("\n=== Sending Initial Relay States ===\n");
         for (int i = 0; i < 4; i++) {
             bool state = relays.getRelayState(i);
             vpsWebSocket.sendRelayState(i, state, "manual", "system");
-            DEBUG_PRINTF("Relay %d initial state: %s\n", i, state ? "ON" : "OFF");
+            printf("Relay %d initial state: %s\n", i, state ? "ON" : "OFF");
+            fflush(stdout);
             delay(RELAY_STATE_SEND_DELAY_MS);
         }
-        DEBUG_PRINTLN("[OK] Initial relay states sent");
+        printf("[OK] Initial relay states sent\n");
+        fflush(stdout);
         
         delay(WS_INITIAL_STATE_DELAY_MS);
         sendSensorData();
     } else {
-        DEBUG_PRINTLN("⚠ WebSocket connection failed, will retry in loop");
+        printf("⚠ WebSocket connection failed, will retry in loop\n");
+        fflush(stdout);
     }
     
-    DEBUG_PRINTLN("\n=== Setup Complete ===");
-    DEBUG_PRINTLN("Entering main loop...\n");
+    printf("\n=== Setup Complete ===\n");
+    printf("Entering main loop...\n\n");
+    fflush(stdout);
 }
 
 /**
@@ -362,11 +328,10 @@ void setup() {
  * 
  * Performs all ongoing system operations in priority order:
  * 1. Watchdog feeding (prevents system reset)
- * 2. OTA update handling (allows remote firmware updates)
- * 3. WebSocket communication maintenance
- * 4. VPS connectivity health checks
- * 5. Sensor data transmission
- * 6. System metrics reporting
+ * 2. WebSocket communication maintenance
+ * 3. VPS connectivity health checks
+ * 4. Sensor data transmission
+ * 5. System metrics reporting
  * 
  * This loop must execute reliably for continuous greenhouse operation.
  * All operations are designed to be non-blocking to maintain responsiveness.
@@ -374,11 +339,6 @@ void setup() {
 void loop() {
     // Feed the watchdog timer at the start of each loop iteration
     esp_task_wdt_reset();
-    
-    // Handle OTA updates
-    #if OTA_ENABLED
-    ArduinoOTA.handle();
-    #endif
     
     vpsWebSocket.loop();
     checkVPSHealth();
