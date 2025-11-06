@@ -1,0 +1,218 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                 ESQUEMA DE CONEXIONES ESP32-C3 SUPER MINI                       ║
+║                      Greenhouse IoT - PCB Base                                  ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              ESP32-C3 SUPER MINI - PINOUT REAL (Tu Modelo)                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│         LADO IZQUIERDO              LADO DERECHO (SPI)                     │
+│         ┌──────────────┐            ┌──────────────┐                      │
+│         │  GND  GND    │            │ 5V  GPIO5    │ ← MISO (SPI)         │
+│         │  5V   5V     │            │ 3V3 GPIO6    │ ← MOSI (SPI)         │
+│         │  3V3  3V3    │            │ GND GPIO7    │ ← SS   (SPI)         │
+│         │              │            │ RX  GPIO8    │ ← SDA  (I2C)         │
+│         │ A0(GPIO0)    │            │ TX  GPIO9    │ ← SCL  (I2C)         │
+│         │ A1(GPIO1)    │ ←DHT11     │ GPIO20       │ ← RX   (UART)        │
+│         │ A2(GPIO2)    │ ←RELAY 1   │ GPIO21       │ ← TX   (UART)        │
+│         │ A3(GPIO3)    │ ←RELAY 2   │              │                      │
+│         │ A4(GPIO4)    │ ←RELAY 3   │              │                      │
+│         │ SCK(GPIO10)  │ ←RELAY 4   │              │                      │
+│         │              │            │              │                      │
+│         │ GND  GND     │            │ GND  GND     │                      │
+│         └──────────────┘            └──────────────┘                      │
+│                                                                             │
+│  NOTA: No hay USB JTAG expuesto físicamente en esta versión               │
+│        (Va por los pines USB ocultos internamente)                         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    CONEXIONES ESPECÍFICAS POR COMPONENTE                       ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🌡️  DHT11 - SENSOR TEMPERATURA/HUMEDAD                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Conexión:                                                                 │
+│  ┌─────────────────┐                                                       │
+│  │ VCC → 3V3       │                                                       │
+│  │ GND → GND       │                                                       │
+│  │ DATA → GPIO1    │ (PIN A1 - lado izquierdo)                           │
+│  └─────────────────┘                                                       │
+│                                                                             │
+│  En la placa:                                                              │
+│    +3V3 (rojo) ─────────►  Lado derecho arriba (3V3)                      │
+│    GND (negro) ─────────►  Lado izquierdo (GND)                           │
+│    DATA (amarillo) ─────►  PIN A1 (GPIO1) - lado izquierdo               │
+│                                                                             │
+│  Opcional: Pull-up 10kΩ en DATA si hay problemas                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🌱 SENSOR HUMEDAD DEL SUELO - CAPACITIVO                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Conexión (módulo con 3 pines: A0, +, -):                                 │
+│  ┌─────────────────┐                                                       │
+│  │ + (VCC) → 3V3   │                                                       │
+│  │ - (GND) → GND   │                                                       │
+│  │ A0 → GPIO0      │ (PIN A0 - lado izquierdo, ABAJO)                    │
+│  └─────────────────┘                                                       │
+│                                                                             │
+│  En la placa:                                                              │
+│    +3V3 (rojo) ─────────►  Lado derecho arriba (3V3)                      │
+│    GND (negro) ─────────►  Lado izquierdo (GND)                           │
+│    Analog Out (blanco) ──►  PIN A0 (GPIO0) - lado izquierdo, abajo       │
+│                                                                             │
+│  Rango de valores esperados:                                               │
+│  - Seco (aire): ~3800-4095                                                │
+│  - Mojado (agua): ~0-500                                                  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🔌 RELÉS (4 CANALES) - 5V                                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Configuración de pines ESP32-C3 Super Mini:                              │
+│                                                                             │
+│  ┌───────────────────────┐                                                │
+│  │ RELAY 1 (Luces)       │                                                │
+│  │ IN → GPIO2 (A2)       │  ← Lado izquierdo (3° pin desde arriba)      │
+│  │ VCC → 5V              │  ← Lado derecho arriba (5V)                  │
+│  │ GND → GND             │  ← Cualquier GND                             │
+│  └───────────────────────┘                                                │
+│                                                                             │
+│  ┌───────────────────────┐                                                │
+│  │ RELAY 2 (Ventilador)  │                                                │
+│  │ IN → GPIO3 (A3)       │  ← Lado izquierdo (4° pin desde arriba)      │
+│  │ VCC → 5V              │  ← Lado derecho arriba (5V)                  │
+│  │ GND → GND             │  ← Cualquier GND                             │
+│  └───────────────────────┘                                                │
+│                                                                             │
+│  ┌───────────────────────┐                                                │
+│  │ RELAY 3 (Bomba)       │                                                │
+│  │ IN → GPIO4 (A4)       │  ← Lado izquierdo (5° pin desde arriba)      │
+│  │ VCC → 5V              │  ← Lado derecho arriba (5V)                  │
+│  │ GND → GND             │  ← Cualquier GND                             │
+│  └───────────────────────┘                                                │
+│                                                                             │
+│  ┌───────────────────────┐                                                │
+│  │ RELAY 4 (Calefactor)  │                                                │
+│  │ IN → GPIO10 (SCK)     │  ← Lado izquierdo (último pin antes de GND)  │
+│  │ VCC → 5V              │  ← Lado derecho arriba (5V)                  │
+│  │ GND → GND             │  ← Cualquier GND                             │
+│  └───────────────────────┘                                                │
+│                                                                             │
+│  ⚠️  IMPORTANTE:                                                           │
+│  - Todos los relés comparten VCC (5V) y GND                              │
+│  - Verifica que tu módulo de relés sea de 5V (casi todos lo son)         │
+│  - Si fuera 3.3V, se acepta directamente, pero 5V es más común          │
+│  - Conecta los 4 GND en paralelo (no en serie)                          │
+│  - Opcionalmente: diodos 1N4007 en reverso en cada bobina               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                      DIAGRAMA DE LA PLACA - VISTA REAL                         ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+       LADO IZQUIERDO                    LADO DERECHO (SPI)
+       ┌──────────────┐                  ┌──────────────┐
+       │              │                  │              │
+       │  GND  ●  ●   │                  │  ●  ●  5V    │ ← 5V para relés
+       │  ●    ●  5V  │                  │  ●  ●  3V3   │
+       │  ●    ●  3V3 │                  │  ●  ●  GND   │
+       │       ●      │                  │  ●  ●  RX    │
+       │ A0    ●      │ ←─── GPIO0  ─────► Soil Moisture (Analog)
+       │ A1    ●      │ ←─── GPIO1  ─────► DHT11 (Data)
+       │ A2    ●      │ ←─── GPIO2  ─────► RELAY 1 (Luces)
+       │ A3    ●      │ ←─── GPIO3  ─────► RELAY 2 (Ventilador)
+       │ A4    ●      │ ←─── GPIO4  ─────► RELAY 3 (Bomba)
+       │ SCK   ●      │ ←─── GPIO10 ─────► RELAY 4 (Calefactor)
+       │       ●      │
+       │  GND  ●  ●   │                  │  ●  ●  TX    │
+       │              │                  │              │
+       └──────────────┘                  └──────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                      TABLA DE RESUMEN DE CONEXIONES                            ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────┬──────────────┬──────────┬─────────────────────────────┐
+│ Componente          │ Pin ESP32-C3 │ Voltaje  │ Ubicación en placa          │
+├─────────────────────┼──────────────┼──────────┼─────────────────────────────┤
+│ DHT11 DATA          │ GPIO1 (A1)   │ 3.3V     │ Lado izq., 2° desde arriba  │
+│ Soil Moisture ADC   │ GPIO0 (A0)   │ 3.3V     │ Lado izq., 1° desde arriba  │
+│ RELAY 1 (Luces)     │ GPIO2 (A2)   │ 5V       │ Lado izq., 3° desde arriba  │
+│ RELAY 2 (Ventilador)│ GPIO3 (A3)   │ 5V       │ Lado izq., 4° desde arriba  │
+│ RELAY 3 (Bomba)     │ GPIO4 (A4)   │ 5V       │ Lado izq., 5° desde arriba  │
+│ RELAY 4 (Calefactor)│ GPIO10 (SCK) │ 5V       │ Lado izq., último antes GND │
+│ 5V (para relés)     │ 5V           │ +5V      │ Lado derecho, arriba        │
+│ 3.3V (sensores)     │ 3V3          │ +3.3V    │ Lado derecho                │
+│ GND (masa común)    │ GND          │ 0V       │ Ambos lados                 │
+└─────────────────────┴──────────────┴──────────┴─────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                      GUÍA DE SOLDADURA PASO A PASO                             ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+PASO 1: PREPARACIÓN
+  ✓ Busca los pines exactos en la placa usando la foto de arriba
+  ✓ Limpia los pines con flux de soldadura
+  ✓ Prepara cables de colores: Rojo (5V/3.3V), Negro (GND), Otros (Signals)
+
+PASO 2: SOLDADURA DE MASAS (GND)
+  ✓ Solda todos los GND juntos en un punto común (BUS DE GND)
+  ✓ Desde el BUS, conecta:
+    - GND al módulo de relés
+    - GND al sensor DHT11
+    - GND al sensor de humedad
+  → Esto crea la MASA COMÚN (muy importante)
+
+PASO 3: SOLDADURA DE ALIMENTACIÓN
+  ✓ Desde 5V (lado derecho arriba):
+    - 5V a todos los relés (IN VCC común)
+  ✓ Desde 3V3 (lado derecho):
+    - 3V3 a DHT11 (VCC)
+    - 3V3 a sensor de humedad (+)
+
+PASO 4: SOLDADURA DE SEÑALES (ORDEN IMPORTANTE)
+  1. DHT11 DATA → GPIO1 (A1)
+  2. Soil Moisture → GPIO0 (A0)
+  3. RELAY 1 IN → GPIO2 (A2)
+  4. RELAY 2 IN → GPIO3 (A3)
+  5. RELAY 3 IN → GPIO4 (A4)
+  6. RELAY 4 IN → GPIO10 (SCK)
+
+PASO 5: PRUEBA DE CONTINUIDAD
+  ✓ Con multímetro, verifica:
+    - Continuidad de GND entre todos los puntos
+    - Voltaje de 5V en los relés
+    - Voltaje de 3.3V en los sensores
+    - No hay cortocircuitos entre señales
+
+PASO 6: VERIFICACIÓN VISUAL
+  ✓ Revisa las soldaduras:
+    - Forma de lágrima (no bolitas)
+    - Sin puentes entre pines
+    - Sin estaño frío (mate/gris)
+
+═══════════════════════════════════════════════════════════════════════════════════
+                    ¡LISTO PARA SOLDAR TU PLACA! 🔥
+═══════════════════════════════════════════════════════════════════════════════════
+
+RESUMEN FINAL:
+  - DHT11: GPIO1 (A1)
+  - Soil Moisture: GPIO0 (A0)  
+  - Relé 1: GPIO2 (A2)
+  - Relé 2: GPIO3 (A3)
+  - Relé 3: GPIO4 (A4)
+  - Relé 4: GPIO10 (SCK)
+  - Todos comparten: 5V, 3V3, GND común
+
+═══════════════════════════════════════════════════════════════════════════════════

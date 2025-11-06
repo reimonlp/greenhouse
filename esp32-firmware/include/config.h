@@ -97,9 +97,10 @@
     #endif
     
     // Legacy macros - map to DEBUG level for backward compatibility
-    #define DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
-    #define DEBUG_PRINTLN(...) LOG_DEBUG(__VA_ARGS__)
-    #define DEBUG_PRINTF(...) LOG_DEBUGF(__VA_ARGS__)
+    // Use printf() for ESP32-C3 USB JTAG console compatibility
+    #define DEBUG_PRINT(...) printf(__VA_ARGS__); fflush(stdout)
+    #define DEBUG_PRINTLN(...) printf(__VA_ARGS__); printf("\n"); fflush(stdout)
+    #define DEBUG_PRINTF(...) printf(__VA_ARGS__); fflush(stdout)
 #endif
 
 // ========== CONFIGURACIÓN DE HARDWARE ==========

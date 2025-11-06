@@ -1,0 +1,189 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                 ESQUEMA DE CONEXIONES ESP32-C3-DevKitM-1                       ║
+║                      Greenhouse IoT - PCB Base                                 ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ESP32-C3-DevKitM-1 PINOUT                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  LADO IZQUIERDO (USB/Debug side)      LADO DERECHO (Expansión side)       │
+│  ┌──────────────────┐                 ┌──────────────────┐                 │
+│  │  GND     GND GND │                 │  GND     GND GND │                 │
+│  │  5V      5V  5V  │ ← USB VBUS      │  3V3     3V3 3V3 │ ← Reg 3.3V     │
+│  │                  │                 │                  │                 │
+│  │  D20  (GPIO 20)  │ ← Rescue Pin    │  D0   (GPIO 0)   │ ← BOOT (no ok) │
+│  │  D19  (GPIO 19)  │ ← Available     │  D1   (GPIO 1)   │ ← DEBUG (no ok)│
+│  │  D18  (GPIO 18)  │ ← Available     │  D2   (GPIO 2)   │ ← Flash (no ok)│
+│  │  D17  (GPIO 17)  │ ← Available     │  D3   (GPIO 3)   │ ← DHT11 ✓      │
+│  │  D16  (GPIO 16)  │ ← Available     │  D4   (GPIO 4)   │ ← Soil Moi. ✓  │
+│  │  D15  (GPIO 15)  │ ← Available     │  D5   (GPIO 5)   │ ← Flash (no ok)│
+│  │  D14  (GPIO 14)  │ ← Available     │  D6   (GPIO 6)   │ ← Flash (no ok)│
+│  │  D13  (GPIO 13)  │ ← RELAY 4       │  D7   (GPIO 7)   │ ← Flash (no ok)│
+│  │  D12  (GPIO 12)  │ ← RELAY 3       │  D8   (GPIO 8)   │ ← USB JTAG (no)│
+│  │  D11  (GPIO 11)  │ ← RELAY 2       │  D9   (GPIO 9)   │ ← USB JTAG (no)│
+│  │  D10  (GPIO 10)  │ ← RELAY 1       │  D21  (GPIO 21)  │ ← XTAL (no ok) │
+│  │                  │                 │                  │                 │
+│  └──────────────────┘                 └──────────────────┘                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    CONEXIONES POR COMPONENTE                                   ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🌡️  DHT11 - SENSOR TEMPERATURA/HUMEDAD                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  DHT11 (sensor de plástico)                                               │
+│  ┌─────────────────┐                                                       │
+│  │  1  2  3  4     │                                                       │
+│  └─────┬───┬───┬───┘                                                       │
+│        │   │   │                                                           │
+│        1   2   4        (PIN 3 no se usa)                                  │
+│        │   │   │                                                           │
+│   VCC──┘   │   └──GND                                                      │
+│            │                                                               │
+│          DATA                                                              │
+│            │                                                               │
+│         GPIO 3 (D3)                                                        │
+│                                                                             │
+│  Recomendación: Usar Pull-up de 10kΩ en DATA si hay problemas             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🌱 SENSOR HUMEDAD DEL SUELO - CAPACITIVO                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Módulo Sensor Humedad Suelo (PCB pequeño)                                │
+│  ┌─────────────────┐                                                       │
+│  │  A0  +  -       │                                                       │
+│  └──┬──┬──┬────────┘                                                       │
+│     │  │  │                                                                │
+│     │  │  GND ──────────────► GND (ESP32)                                  │
+│     │  │                                                                    │
+│     │  VCC (+) ──────────────► 3.3V (ESP32)                                │
+│     │                                                                       │
+│     Analog Out (A0) ──────────► GPIO 4 (ADC1_CH3)                          │
+│                                                                             │
+│  Calibración esperada:                                                     │
+│  - Seco (aire):     ~3800-4095                                             │
+│  - Mojado (agua):   ~0-500                                                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🔌 RELÉS (4 CANALES)                                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Módulo Relé 4 Canales (típico tipo SRD-05VDC-SL-C)                       │
+│  ┌─────────────────────────────┐                                           │
+│  │  IN1  IN2  IN3  IN4         │   ← Entradas de Control (Signal)         │
+│  │  GND  GND  GND  GND         │   ← Común Ground                         │
+│  │  VCC  VCC  VCC  VCC         │   ← Alimentación                         │
+│  └──┬──┬──┬──┬──┬──┬──┬──┬──┬─┘                                           │
+│     │  │  │  │  │  │  │  │  │                                             │
+│  ┌──┘  │  │  │  │  │  │  │  └──────────► GND                             │
+│  │     │  │  │  │  │  │  │                                                │
+│  │  ┌──┘  │  │  │  │  │  └──────────► 5V (o 3.3V según el módulo)       │
+│  │  │                                                                      │
+│  │  └─────────────────────────────────► GPIO 10 (RELAY 1 - Luces)        │
+│  │                                                                         │
+│  ├─────────────────────────────────────► GPIO 11 (RELAY 2 - Ventilador)  │
+│  │                                                                         │
+│  ├─────────────────────────────────────► GPIO 12 (RELAY 3 - Bomba)       │
+│  │                                                                         │
+│  └─────────────────────────────────────► GPIO 13 (RELAY 4 - Calefactor) │
+│                                                                             │
+│  IMPORTANTE:                                                               │
+│  - Verificar voltaje del módulo (3.3V o 5V)                               │
+│  - Si es 5V: usar optoacoplador o buffer entre ESP32 y relés             │
+│  - Conectar GND del relé con GND del ESP32 (MASA COMÚN)                  │
+│  - Opcional: agregar diodo de protección (1N4007) en cada bobina          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                      DIAGRAMA DE CONEXIONES - VISTA GENERAL                    ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+                            ┌──────────────────┐
+                            │  ESP32-C3-DevKit │
+                            └──────────────────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        │                             │                             │
+        │                             │                             │
+    ┌───┴────┐                   ┌───┴────┐                   ┌────┴────┐
+    │  3.3V  │                   │  5V    │                   │   GND   │
+    └───┬────┘                   └───┬────┘                   └────┬────┘
+        │                           │                             │
+        │                           │                             │
+   ┌────┴─────────┐            ┌────┴─────────┐            ┌──────┴──────┐
+   │ DHT11        │            │  Relés       │            │  MASA COMÚN │
+   │ +3.3V (VCC)  │            │  +5V (VCC)   │            │             │
+   │ GPIO3 (DATA) │            │  GND         │            │ Sensor      │
+   │ GND          │            │              │            │ Humedad     │
+   └──────────────┘            │ GPIO10-13    │            │ (GND)       │
+                               │ (IN1-IN4)    │            │             │
+                               └──────────────┘            │ DHT11 (GND) │
+                                                           │             │
+                                                           └─────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         TABLA DE PRUEBA RÁPIDA                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Componente          │ Pin ESP32-C3 │ Voltaje │ Estado Inicial │ Nota        │
+├─────────────────────┼──────────────┼─────────┼────────────────┼─────────────┤
+│ DHT11 DATA          │ GPIO 3 (D3)  │ 3.3V    │ Idle (1)       │ Pull-up ok  │
+│ Soil Moisture ADC   │ GPIO 4 (D4)  │ 3.3V    │ Analog 0-4095  │ Varía       │
+│ RELAY 1 (Luces)     │ GPIO 10 (D10)│ 5V     │ LOW (off)      │ Active HIGH │
+│ RELAY 2 (Ventilador)│ GPIO 11 (D11)│ 5V     │ LOW (off)      │ Active HIGH │
+│ RELAY 3 (Bomba)     │ GPIO 12 (D12)│ 5V     │ LOW (off)      │ Active HIGH │
+│ RELAY 4 (Calefactor)│ GPIO 13 (D13)│ 5V     │ LOW (off)      │ Active HIGH │
+│ GND (Masa)          │ GND          │ 0V     │ Referencia     │ COMÚN       │
+│ 3.3V                │ 3V3          │ +3.3V  │ Estable        │ Regulado    │
+│ 5V (USB)            │ VBUS / 5V    │ +5V    │ Estable        │ USB Power   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                           NOTAS IMPORTANTES                                    ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+1. ✅ PINES LIBRES PARA USAR:
+   - GPIO 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20
+
+2. ❌ PINES RESERVADOS (NO TOCAR):
+   - GPIO 0, 1: Boot selector
+   - GPIO 2-7: SPI Flash (comunicación con memoria)
+   - GPIO 8, 9: USB JTAG debugger
+   - GPIO 21: XTAL (cristal)
+
+3. ⚡ ALIMENTACIÓN:
+   - 3.3V: Sensor DHT11, Sensor Humedad (salida analógica)
+   - 5V: Módulo relés (verificar si es 3.3V o 5V)
+   - GND: Conexión común a todos (MUY IMPORTANTE)
+
+4. 🔧 SOLDADURA:
+   - Usa estaño de buena calidad (Sn63/Pb37 o Sn96.5/Ag3/Cu0.5)
+   - No calientes más de 3 segundos por punto
+   - Pule después con flux de limpieza
+   - Verifica continuidad con multímetro
+
+5. 📡 PRUEBA INICIAL:
+   - Conecta solo GND y 3.3V primero
+   - Verifica voltaje con multímetro
+   - Luego agrega DHT11
+   - Luego agrega sensor humedad
+   - Finalmente conecta relés con cuidado
+
+6. ⚠️  PROTECCIÓN:
+   - Si relés son 5V y ESP32 es 3.3V: usar optoacoplador
+   - Agregar resistencias pull-down de 10k en inputs de relé (opcional)
+   - Diodos 1N4007 en reverso en cada bobina del relé (protección contra picos)
+
+═══════════════════════════════════════════════════════════════════════════════════
+                            ¡Listo para soldar! 🔥
+═══════════════════════════════════════════════════════════════════════════════════
