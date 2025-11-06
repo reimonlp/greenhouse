@@ -10,6 +10,7 @@
 #include <WiFi.h>
 #include <time.h>
 #include <esp_task_wdt.h>
+#include <ArduinoOTA.h>
 #include "config.h"
 #include "vps_config.h"
 #include "vps_websocket.h"
@@ -126,6 +127,73 @@ void setupNTP() {
         printf("[WARN] Time sync failed\n");
         fflush(stdout);
     }
+}
+
+/**
+ * @brief Configure Arduino OTA for WiFi-based firmware updates
+ * 
+ * Enables over-the-air updates via ArduinoOTA:
+ * - Sets device hostname for network identification
+ * - Configures security with authentication password
+ * - Registers callbacks for update lifecycle events
+ * - Non-blocking operation (handled in loop)
+ * 
+ * Critical for remote firmware maintenance without physical access.
+ */
+void setupOTA() {
+    printf("\nSetting up OTA...\n");
+    fflush(stdout);
+    
+    ArduinoOTA.setHostname("greenhouse-esp32c3");
+    
+    // Security: require password for OTA updates
+    ArduinoOTA.setPassword(WIFI_PASSWORD);
+    
+    // OTA callbacks
+    ArduinoOTA.onStart([]() {
+        printf("\n⏳ OTA Update starting...\n");
+        fflush(stdout);
+        // Disable watchdog during OTA
+        esp_task_wdt_deinit();
+    });
+    
+    ArduinoOTA.onEnd([]() {
+        printf("✓ OTA Update complete!\n");
+        fflush(stdout);
+    });
+    
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        // Print progress every 10%
+        static unsigned int lastPercent = 0;
+        unsigned int percent = (progress / (total / 100));
+        if (percent - lastPercent >= 10) {
+            printf("Progress: %u%%\n", percent);
+            fflush(stdout);
+            lastPercent = percent;
+        }
+    });
+    
+    ArduinoOTA.onError([](ota_error_t error) {
+        printf("✗ OTA Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) {
+            printf("Auth Failed\n");
+        } else if (error == OTA_BEGIN_ERROR) {
+            printf("Begin Failed\n");
+        } else if (error == OTA_CONNECT_ERROR) {
+            printf("Connect Failed\n");
+        } else if (error == OTA_RECEIVE_ERROR) {
+            printf("Receive Failed\n");
+        } else if (error == OTA_END_ERROR) {
+            printf("End Failed\n");
+        }
+        fflush(stdout);
+        // Re-enable watchdog after error
+        esp_task_wdt_init(30, true);
+    });
+    
+    ArduinoOTA.begin();
+    printf("[OK] OTA ready\n");
+    fflush(stdout);
 }
 
 void checkVPSHealth() {
@@ -273,6 +341,7 @@ void setup() {
     
     setupWiFi();
     setupNTP();
+    setupOTA();
     
     printf("\n=== Initializing WebSocket ===\n");
     vpsWebSocket.begin();
@@ -339,6 +408,9 @@ void setup() {
 void loop() {
     // Feed the watchdog timer at the start of each loop iteration
     esp_task_wdt_reset();
+    
+    // Handle OTA updates
+    ArduinoOTA.handle();
     
     vpsWebSocket.loop();
     checkVPSHealth();
