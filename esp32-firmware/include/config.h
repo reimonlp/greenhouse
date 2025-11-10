@@ -127,23 +127,24 @@
 #define MAX_HEATING_TIME_MS     1800000 // 30 minutos máximo
 
 // ========== CONFIGURACIÓN DE SENSORES ==========
-#define DHT_TYPE                DHT11
+#define DHT_TYPE                DHT22
 #define SENSOR_READ_INTERVAL_MS 5000
 #define SOIL_MOISTURE_SAMPLES   10
 #ifndef SOIL_SAMPLE_INTERVAL_MS
 #define SOIL_SAMPLE_INTERVAL_MS 10
 #endif
 
-// ========== VALIDACIÓN DE RANGOS DHT11 ==========
-// DHT11 datasheet specifications
-#define DHT11_MIN_TEMP          0.0f    // DHT11 minimum temperature (°C)
-#define DHT11_MAX_TEMP          50.0f   // DHT11 maximum temperature (°C)
-#define DHT11_MIN_HUMIDITY      20.0f   // DHT11 minimum humidity (%)
-#define DHT11_MAX_HUMIDITY      90.0f   // DHT11 maximum humidity (%)
+// ========== VALIDACIÓN DE RANGOS DHT22 ==========
+// DHT22 datasheet specifications (AM2302)
+// More precise and wider range than DHT11
+#define DHT11_MIN_TEMP          -40.0f   // DHT22 minimum temperature (°C)
+#define DHT11_MAX_TEMP          80.0f    // DHT22 maximum temperature (°C)
+#define DHT11_MIN_HUMIDITY      0.0f     // DHT22 minimum humidity (%)
+#define DHT11_MAX_HUMIDITY      100.0f   // DHT22 maximum humidity (%)
 
-// Anomaly detection thresholds
-#define MAX_TEMP_CHANGE_PER_READ    10.0f   // Maximum °C change between consecutive reads
-#define MAX_HUMIDITY_CHANGE_PER_READ 20.0f  // Maximum % change between consecutive reads
+// Anomaly detection thresholds (relaxed for DHT22 precision)
+#define MAX_TEMP_CHANGE_PER_READ    5.0f    // Maximum °C change between consecutive reads
+#define MAX_HUMIDITY_CHANGE_PER_READ 10.0f  // Maximum % change between consecutive reads
 
 // Error handling
 #define SENSOR_MAX_CONSECUTIVE_ERRORS 3     // Max errors before marking sensor as faulty
@@ -154,10 +155,10 @@
 #endif
 #define TEMP_SENSOR_PRECISION   12
 #ifndef DHT_STABILIZE_MS
-#define DHT_STABILIZE_MS 2000
+#define DHT_STABILIZE_MS 3000  // DHT22 needs ~2.5s to stabilize (DHT11 was 2s)
 #endif
 #ifndef DHT_STABILIZE_MIN_MS
-#define DHT_STABILIZE_MIN_MS 600
+#define DHT_STABILIZE_MIN_MS 2000  // Increased for DHT22
 #endif
 #ifndef DHT_STABILIZE_DECAY_FACTOR
 #define DHT_STABILIZE_DECAY_FACTOR 0.5f
@@ -197,8 +198,8 @@
 #define CIRCUIT_BREAKER_TEST_MOD_MS     1000    // Circuit breaker test modulo
 
 // Sensor Reading
-#define SENSOR_READ_MIN_INTERVAL_MS     2000    // Minimum interval between sensor reads
-#define DHT_INIT_STABILIZE_DELAY_MS     2000    // DHT stabilization delay on init
+#define SENSOR_READ_MIN_INTERVAL_MS     3000    // Minimum interval between sensor reads (DHT22 needs 2-3s)
+#define DHT_INIT_STABILIZE_DELAY_MS     3000    // DHT22 stabilization delay on init (increased from 2s)
 #define SOIL_MOISTURE_READ_DELAY_MS     10      // Delay between soil moisture samples
 
 // Relay Control

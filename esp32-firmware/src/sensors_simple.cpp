@@ -139,9 +139,29 @@ bool SensorManager::readSensors() {
     
     lastReadTime = now;
     
-    // Read DHT11
-    float temp = dht->readTemperature();
-    float hum = dht->readHumidity();
+    // Read DHT11 with retry logic (DHT11 sometimes fails first read)
+    float temp = NAN;
+    float hum = NAN;
+    int retries = 3;
+    
+    while (isnan(temp) || isnan(hum)) {
+        temp = dht->readTemperature();
+        hum = dht->readHumidity();
+        
+        if (isnan(temp) || isnan(hum)) {
+            retries--;
+            if (retries <= 0) {
+                printf("[DHT11] Read failed after 3 attempts: temp=%s, hum=%s\n", 
+                       isnan(temp) ? "NaN" : "valid", 
+                       isnan(hum) ? "NaN" : "valid");
+                fflush(stdout);
+                break;
+            }
+            printf("[DHT11] Retry %d...\n", 4 - retries);
+            fflush(stdout);
+            delay(500);  // Wait before retry
+        }
+    }
     
     // Store last measured values (always, even if invalid)
     lastMeasuredTemp = temp;
@@ -159,6 +179,8 @@ bool SensorManager::readSensors() {
         currentData.timestamp = now;
         currentData.valid = true;
         lastValidData = currentData;
+        printf("[DHT11] Valid: %.1f°C, %.1f%%\n", temp, hum);
+        fflush(stdout);
     } else {
         // Suprimir advertencias si la humedad de la API es alta
         bool suppressWarnings = (externalHumidity > 90.0f);
@@ -177,6 +199,10 @@ bool SensorManager::readSensors() {
         currentData.humidity = lastMeasuredHumidity;
         currentData.timestamp = now;
         currentData.valid = false;
+        printf("[DHT11] Invalid: temp=%s, hum=%s\n", 
+               isnan(temp) ? "NaN" : "valid", 
+               isnan(hum) ? "NaN" : "valid");
+        fflush(stdout);
     }
     
     // Read soil moisture (simplified)
