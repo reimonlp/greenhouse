@@ -342,11 +342,34 @@ const wsUrl = import.meta.env.DEV
 
 ## Common Patterns & Gotchas
 
+### Current Sensor Configuration
+**Active Sensor: DHT22 (AM2302)**
+- Temperature: -40°C to 80°C (±0.5°C accuracy)
+- Humidity: 0-100% RH (±2% accuracy)
+- Interface: Single-wire digital (GPIO 1)
+- Response time: ~2 seconds
+- Read interval: 3000ms (DHT22 timing requirement)
+
+**Legacy Sensor: DHT11 (Deprecated)**
+- Replaced by DHT22 for better accuracy and range
+- Configuration still in code but not in use
+- To revert: Change `DHT_TYPE DHT22` → `DHT_TYPE DHT11` in `config.h`
+- Note: DHT11 had unreliable readings, DHT22 is production-ready
+
+**Soil Moisture Sensor**
+- Capacitive analog sensor on GPIO 0 (ADC1_CH0)
+- Range: 0-4095 (12-bit ADC)
+- Calibration: DRY_VALUE=4095 (0%), WET_VALUE=1500 (100%)
+- Readings averaged over 10 samples with 10ms delay
+
 ### Adding a New Sensor Type
-1. Update ESP32 `sensors.h` with new struct
-2. Add field to `SensorReading.js` schema
-3. Update `vps_websocket.cpp` `sendSensorData()` to include new field
-4. Dashboard `SensorCard.jsx` reads `latestSensor` from hook; add new chart in `SensorChart.jsx`
+1. Update ESP32 `config.h` with sensor ranges and timings
+2. Add field to `SensorReading.js` schema (backend)
+3. Update `sensors_simple.cpp` `readSensors()` function
+4. Update `vps_websocket.cpp` `sendSensorData()` to include new field
+5. Dashboard `SensorCard.jsx` reads `latestSensor` from hook
+6. Add new chart in `SensorChart.jsx` if visualization needed
+7. Update rule engine conditions in `backend/lib/ruleEngine.js` if needed
 
 ### Relay State Changes
 - Always broadcast via WebSocket after DB save (see `lib/ruleEngine.js` `executeRelayAction()`)
@@ -426,14 +449,16 @@ docker compose down -v                       # Stop and remove volumes
 - **100% WebSocket**: No HTTP polling or REST endpoints
 - **Latency**: 50-100ms real-time updates
 - **Scalability**: Single persistent connection per client
-- **Build**: 0 errors
+- **Build**: 0 errors, 73.0% flash usage (956KB/1.3MB)
 - **Project Structure**: Clean and organized
 - **Relay Modes**: Manual (user control) and Auto (rules enabled) fully working
 - **Manual Mode Protection**: Rules automatically skip execution when relay in 'manual' mode
 - **Frontend UI**: Relay switch hidden in 'auto' mode, visible in 'manual' mode
 - **Logging**: Clean production output (verbose debug logs removed from rule engine)
 - **Database**: MongoDB TTL auto-cleanup, auto-initialization of relay states on startup
-- **ESP32-C3**: Hardware verified, USB JTAG working, WebSocket client ready for testing
+- **ESP32-C3 Super Mini**: Hardware verified, USB JTAG working, DHT22 sensor support, all 4 relays tested
+- **Sensors**: DHT22 (temperature/humidity) + Capacitive soil moisture
+- **OTA Updates**: Ready via mDNS (greenhouse-esp32c3.local:3232)
 
 ## ESP32-C3 Integration Lessons Learned (feature/esp32-c3-clean)
 
