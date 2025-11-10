@@ -49,7 +49,7 @@ bool RelayManager::begin() {
     
     for (int i = 0; i < 4; i++) {
         pinMode(relayPins[i], OUTPUT);
-        digitalWrite(relayPins[i], LOW);  // Relays OFF by default (active HIGH)
+        digitalWrite(relayPins[i], HIGH);  // Relays OFF by default (active LOW)
         relayStates[i].is_on = false;
         DEBUG_PRINTF("  Relay %d (%s): PIN %d - OFF\n", i, relayName(i).c_str(), relayPins[i]);
     }
@@ -69,7 +69,7 @@ bool RelayManager::setRelay(int relayIndex, bool state) {
         return false;
     }
     
-    digitalWrite(relayPins[relayIndex], state ? HIGH : LOW);
+    digitalWrite(relayPins[relayIndex], state ? LOW : HIGH);  // Inverted logic (active LOW)
     relayStates[relayIndex].is_on = state;
     relayStates[relayIndex].last_change = millis();
     relayStates[relayIndex].mode = RELAY_MODE_MANUAL;
