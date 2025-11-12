@@ -142,9 +142,9 @@
 #define DHT11_MIN_HUMIDITY      0.0f     // DHT22 minimum humidity (%)
 #define DHT11_MAX_HUMIDITY      100.0f   // DHT22 maximum humidity (%)
 
-// Anomaly detection thresholds (relaxed for DHT22 precision)
-#define MAX_TEMP_CHANGE_PER_READ    5.0f    // Maximum °C change between consecutive reads
-#define MAX_HUMIDITY_CHANGE_PER_READ 10.0f  // Maximum % change between consecutive reads
+// Anomaly detection thresholds (RELAXED for debugging DHT22)
+#define MAX_TEMP_CHANGE_PER_READ    100.0f    // DEBUGGING: Relaxed from 5°C to catch all readings
+#define MAX_HUMIDITY_CHANGE_PER_READ 200.0f  // DEBUGGING: Relaxed from 10% to catch all readings
 
 // Error handling
 #define SENSOR_MAX_CONSECUTIVE_ERRORS 3     // Max errors before marking sensor as faulty

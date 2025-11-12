@@ -71,7 +71,7 @@ bool SensorManager::validateTemperature(float temp) {
         return false;
     }
     
-    // Check DHT11 datasheet range (0°C to 50°C)
+    // Check DHT22 datasheet range (-40°C to 80°C)
     if (temp < DHT11_MIN_TEMP || temp > DHT11_MAX_TEMP) {
         LOG_WARNF("Temperature out of range: %.1f°C (valid: %.0f-%.0f°C)\n", 
                   temp, DHT11_MIN_TEMP, DHT11_MAX_TEMP);
@@ -80,7 +80,8 @@ bool SensorManager::validateTemperature(float temp) {
     }
     
     // Check for abrupt changes (possible sensor glitch)
-    if (consecutiveTempErrors < SENSOR_MAX_CONSECUTIVE_ERRORS) {
+    // Skip this check on first valid reading to allow initial value
+    if (consecutiveTempErrors < SENSOR_MAX_CONSECUTIVE_ERRORS && lastValidTemp != 20.0f) {
         float change = abs(temp - lastValidTemp);
         if (change > MAX_TEMP_CHANGE_PER_READ) {
             LOG_WARNF("Temperature change too abrupt: %.1f°C change (max: %.1f°C)\n", 
@@ -139,7 +140,7 @@ bool SensorManager::readSensors() {
     
     lastReadTime = now;
     
-    // Read DHT11 with retry logic (DHT11 sometimes fails first read)
+    // Read DHT22 with retry logic (DHT22 sometimes fails first read)
     float temp = NAN;
     float hum = NAN;
     int retries = 3;
@@ -151,13 +152,13 @@ bool SensorManager::readSensors() {
         if (isnan(temp) || isnan(hum)) {
             retries--;
             if (retries <= 0) {
-                printf("[DHT11] Read failed after 3 attempts: temp=%s, hum=%s\n", 
+                printf("[DHT22] Read failed after 3 attempts: temp=%s, hum=%s\n", 
                        isnan(temp) ? "NaN" : "valid", 
                        isnan(hum) ? "NaN" : "valid");
                 fflush(stdout);
                 break;
             }
-            printf("[DHT11] Retry %d...\n", 4 - retries);
+            printf("[DHT22] Retry %d...\n", 4 - retries);
             fflush(stdout);
             delay(500);  // Wait before retry
         }
@@ -166,6 +167,19 @@ bool SensorManager::readSensors() {
     // Store last measured values (always, even if invalid)
     lastMeasuredTemp = temp;
     lastMeasuredHumidity = hum;
+    
+    // DEBUG: Check GPIO1 pin state
+    int pin_state = digitalRead(DHT_PIN);
+    printf("[DHT22-HW] GPIO1=%d ", pin_state);
+    fflush(stdout);
+    
+    // DEBUG: Always print raw values
+    printf("[DHT22] Raw reading: temp=%.2f°C, hum=%.2f%% (valid: %s, %s)\n", 
+           isnan(temp) ? 0.0f : temp, 
+           isnan(hum) ? 0.0f : hum,
+           isnan(temp) ? "NaN" : "OK",
+           isnan(hum) ? "NaN" : "OK");
+    fflush(stdout);
     
     // Validate readings using new validation functions
     bool tempValid = validateTemperature(temp);
@@ -179,7 +193,7 @@ bool SensorManager::readSensors() {
         currentData.timestamp = now;
         currentData.valid = true;
         lastValidData = currentData;
-        printf("[DHT11] Valid: %.1f°C, %.1f%%\n", temp, hum);
+        printf("[DHT22] ✓ Valid: %.1f°C, %.1f%%\n", temp, hum);
         fflush(stdout);
     } else {
         // Suprimir advertencias si la humedad de la API es alta
@@ -199,9 +213,9 @@ bool SensorManager::readSensors() {
         currentData.humidity = lastMeasuredHumidity;
         currentData.timestamp = now;
         currentData.valid = false;
-        printf("[DHT11] Invalid: temp=%s, hum=%s\n", 
-               isnan(temp) ? "NaN" : "valid", 
-               isnan(hum) ? "NaN" : "valid");
+        printf("[DHT22] ✗ Invalid: temp=%s (%.1f), hum=%s (%.1f)\n", 
+               isnan(temp) ? "NaN" : "val", isnan(temp) ? 0.0f : temp,
+               isnan(hum) ? "NaN" : "val", isnan(hum) ? 0.0f : hum);
         fflush(stdout);
     }
     
